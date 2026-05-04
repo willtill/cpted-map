@@ -951,6 +951,7 @@ function mkPhotoMkr(p) {
   var sz = Math.round(42 * LAYERS.photo.sz);
   var m = L.marker([p.lat,p.lng], {icon:pinIcon(p.dataUrl,sz)}).addTo(map);
   m._pd = p.dataUrl;
+  m._pid = p.id;  // id로 빠른 검색
   m.on('click',function(){
     var tagsHtml = (p.tags && p.tags.length)
       ? '<div class="ic-row"><div class="ic-k">태그</div><div class="ic-v">'
@@ -1565,38 +1566,102 @@ function mkSurveyMkr(sv){
 
 function updCounts(){
   document.getElementById('pcnt').textContent = LAYERS.photo.mkrs.length;
-  document.getElementById('scnt').textContent = surveys.length;
+  document.getElementById('scnt').textContent = surveys.length + LAYERS.photo.mkrs.length;
 }
 
-// ══ SURVEY LIST ══
+// ══ SURVEY LIST (사진 + 노트 통합) ══
 function openSurveyList(){
-  openSheet('📋 현장 조사 ('+surveys.length+')', '');
+  var total = photos.length + surveys.length;
+  openSheet('📋 현장 기록 ('+total+')', '');
   var body = document.getElementById('shBody');
-  if (!surveys.length) {
-    body.innerHTML='<div style="padding:40px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:2">아직 기록이 없습니다<br>📸 버튼으로 현장 조사를 시작하세요</div>';
+
+  if (!total) {
+    body.innerHTML='<div style="padding:40px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:2">아직 기록이 없습니다<br>📸 버튼으로 현장 기록을 시작하세요</div>';
     return;
   }
-  surveys.slice().reverse().forEach(function(sv){
-    var d=document.createElement('div'); d.className='li';
-    var th = sv.photo ? '<img class="li-th" src="'+sv.photo+'">' : '<div class="li-th">📋</div>';
-    d.innerHTML = th+'<div class="li-inf"><div class="li-n">'+sv.title+'</div><div class="li-s">'+sv.time+(sv.tag?' · #'+sv.tag:'')+'</div></div><button class="li-del" data-id="'+sv.id+'">✕</button>';
+
+  // 사진과 노트를 하나의 배열로 합치기
+  var items = [];
+  photos.forEach(function(p){
+    items.push({
+      type:'photo', id:p.id,
+      title: p.name,
+      thumb: p.dataUrl,
+      sub:   (p.date||'') + (p.tags&&p.tags.length ? ' · '+p.tags.slice(0,3).join(', ') : ''),
+      lat:p.lat, lng:p.lng, _ref:p
+    });
+  });
+  surveys.forEach(function(sv){
+    items.push({
+      type:'survey', id:sv.id,
+      title: sv.title,
+      thumb: sv.photo||null,
+      sub:   sv.time + (sv.tag?' · #'+sv.tag.split(',').slice(0,2).join(' #'):''),
+      lat:sv.lat, lng:sv.lng, _ref:sv
+    });
+  });
+
+  // 최신순 정렬 (id에 타임스탬프 포함)
+  items.sort(function(a,b){ return b.id > a.id ? 1 : -1; });
+
+  items.forEach(function(item){
+    var d = document.createElement('div'); d.className='li';
+
+    // 썸네일
+    var th = item.thumb
+      ? '<img class="li-th" src="'+item.thumb+'">'
+      : '<div class="li-th" style="font-size:22px">'+(item.type==='photo'?'📷':'📋')+'</div>';
+
+    // 유형 뱃지
+    var isPhoto = item.type==='photo';
+    var badge = '<span style="font-size:9px;padding:1px 6px;border-radius:3px;margin-left:5px;'
+      +(isPhoto?'background:rgba(16,185,129,.15);color:var(--green)':'background:rgba(168,85,247,.15);color:var(--purple)')
+      +'">'+(isPhoto?'사진':'노트')+'</span>';
+
+    d.innerHTML = th
+      +'<div class="li-inf">'
+        +'<div class="li-n">'+item.title+badge+'</div>'
+        +'<div class="li-s">'+item.sub+'</div>'
+      +'</div>'
+      +'<button class="li-del" data-id="'+item.id+'" data-type="'+item.type+'">✕</button>';
+
+    // 클릭 → 지도 이동 + 마커 팝업
     d.addEventListener('click', function(e){
       if (e.target.classList.contains('li-del')) return;
-      if (sv.lat) map.flyTo([sv.lat,sv.lng],17,{duration:.8});
       closeAll();
+      if (item.lat) map.flyTo([item.lat, item.lng], 17, {duration:.8});
       setTimeout(function(){
-        var m=LAYERS.survey.mkrs.find(function(mk){return mk._sv&&mk._sv.id===sv.id;});
-        if (m) m.fire('click');
-      },400);
+        if (item.type==='photo') {
+          var m = LAYERS.photo.mkrs.find(function(mk){ return mk._pid===item.id; });
+          if (m) m.fire('click');
+        } else {
+          var m = LAYERS.survey.mkrs.find(function(mk){ return mk._sv&&mk._sv.id===item.id; });
+          if (m) m.fire('click');
+        }
+      }, 450);
     });
-    d.querySelector('.li-del').addEventListener('click',function(e){
+
+    // 삭제 버튼
+    d.querySelector('.li-del').addEventListener('click', function(e){
       e.stopPropagation();
-      var id=this.dataset.id;
-      surveys=surveys.filter(function(s){return s.id!==id;});
-      var mi=LAYERS.survey.mkrs.findIndex(function(mk){return mk._sv&&mk._sv.id===id;});
-      if(mi>=0){map.removeLayer(LAYERS.survey.mkrs[mi]);LAYERS.survey.mkrs.splice(mi,1);LAYERS.survey.cnt=LAYERS.survey.mkrs.length;}
-      idbDel('surveys',id); updCounts(); openSurveyList();
+      var id   = this.dataset.id;
+      var type = this.dataset.type;
+      if (!confirm('"'+item.title+'" 삭제할까요?')) return;
+      if (type==='photo') {
+        photos = photos.filter(function(p){ return p.id!==id; });
+        var mi = LAYERS.photo.mkrs.findIndex(function(mk){ return mk._pid===id; });
+        if (mi>=0){ map.removeLayer(LAYERS.photo.mkrs[mi]); LAYERS.photo.mkrs.splice(mi,1); LAYERS.photo.cnt=LAYERS.photo.mkrs.length; }
+        idbDel('photos', id);
+      } else {
+        surveys = surveys.filter(function(s){ return s.id!==id; });
+        var mi = LAYERS.survey.mkrs.findIndex(function(mk){ return mk._sv&&mk._sv.id===id; });
+        if (mi>=0){ map.removeLayer(LAYERS.survey.mkrs[mi]); LAYERS.survey.mkrs.splice(mi,1); LAYERS.survey.cnt=LAYERS.survey.mkrs.length; }
+        idbDel('surveys', id);
+      }
+      updCounts();
+      openSurveyList();
     });
+
     body.appendChild(d);
   });
 }
@@ -1693,10 +1758,35 @@ document.getElementById('mapSwBtn').addEventListener('click', openMapSheet);
 function openMoreSheet(){
   openSheet('⋯ 더보기','');
   var body=document.getElementById('shBody');
+  var total = photos.length + surveys.length;
   body.innerHTML=
+    '<div style="padding:14px 16px 4px">'+
+      '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">내보내기 / 불러오기</div>'+
+      '<div style="background:var(--p2);border-radius:12px;padding:14px;margin-bottom:10px">'+
+        '<div style="font-size:14px;font-weight:600;margin-bottom:4px">📤 전체 내보내기</div>'+
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">사진 <b style="color:var(--green)">'+photos.length+'</b>개 + 노트 <b style="color:var(--purple)">'+surveys.length+'</b>건<br>JPEG(XMP) + TXT + CSV → ZIP 파일</div>'+
+        '<button class="sf-save" id="exportBtn"'+(total?'':' disabled style="opacity:.4"')+'>📤 내보내기 시작</button>'+
+      '</div>'+
+      '<div style="background:var(--p2);border-radius:12px;padding:14px;margin-bottom:14px">'+
+        '<div style="font-size:14px;font-weight:600;margin-bottom:4px">📥 데이터 불러오기</div>'+
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">이전에 내보낸 JPEG·TXT 파일 선택<br>메타데이터와 지도 마커가 자동 복원됩니다</div>'+
+        '<label style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;width:100%;padding:14px;background:var(--bg);border:1.5px dashed var(--border);border-radius:10px;font-size:13px;color:var(--m2);cursor:pointer">'+
+          '<span>파일 선택</span><span style="font-size:10px;color:var(--muted)">.jpg 사진 / .txt 노트 — 복수 선택 가능</span>'+
+          '<input type="file" id="importInp" accept="image/jpeg,.jpg,.jpeg,.txt,text/plain" multiple style="display:none">'+
+        '</label>'+
+      '</div>'+
+      '<div style="border-top:1px solid var(--border);margin-bottom:4px"></div>'+
+    '</div>'+
     '<div class="li"><div class="li-th">📷</div><div class="li-inf"><div class="li-n">현장 사진</div><div class="li-s">'+photos.length+'개</div></div><button class="li-del" id="clrP">삭제</button></div>'+
-    '<div class="li"><div class="li-th">📋</div><div class="li-inf"><div class="li-n">현장 조사</div><div class="li-s">'+surveys.length+'건</div></div><button class="li-del" id="clrS">삭제</button></div>'+
-    '';
+    '<div class="li"><div class="li-th">📋</div><div class="li-inf"><div class="li-n">현장 조사</div><div class="li-s">'+surveys.length+'건</div></div><button class="li-del" id="clrS">삭제</button></div>';
+
+  document.getElementById('exportBtn').addEventListener('click', function(){ closeAll(); exportAll(); });
+  document.getElementById('importInp').addEventListener('change', function(e){
+    if (!e.target.files||!e.target.files.length) return;
+    var files = e.target.files; e.target.value='';
+    closeAll();
+    setTimeout(function(){ importFromFiles(files); }, 300);
+  });
   document.getElementById('clrP').addEventListener('click',function(){
     if(!confirm('사진 '+photos.length+'개 삭제?'))return;
     LAYERS.photo.mkrs.forEach(function(m){map.removeLayer(m);}); LAYERS.photo.mkrs=[]; LAYERS.photo.cnt=0;
@@ -1707,7 +1797,256 @@ function openMoreSheet(){
     LAYERS.survey.mkrs.forEach(function(m){map.removeLayer(m);}); LAYERS.survey.mkrs=[]; LAYERS.survey.cnt=0;
     surveys=[]; idbClear('surveys'); updCounts(); toast('삭제됨'); closeAll();
   });
-  
+}
+
+// ══ EXPORT / IMPORT ══
+
+function escCSV(v){
+  var s=String(v==null?'':v).replace(/"/g,'""');
+  return (s.indexOf(',')>=0||s.indexOf('\n')>=0||s.indexOf('"')>=0)?'"'+s+'"':s;
+}
+function dataUrlToBlob(dataUrl){
+  var arr=dataUrl.split(','), mime=(arr[0].match(/:(.*?);/)||['','image/jpeg'])[1];
+  var bstr=atob(arr[1]), u8=new Uint8Array(bstr.length);
+  for(var i=0;i<bstr.length;i++) u8[i]=bstr.charCodeAt(i);
+  return new Blob([u8],{type:mime});
+}
+function buildSurveyTxt(sv){
+  return ['=== CPTED 현장노트 ===',
+    '제목: '+(sv.title||''),
+    '일시: '+(sv.time||''),
+    '위도: '+(sv.lat||''),
+    '경도: '+(sv.lng||''),
+    '위치출처: '+(sv.gpsSource||''),
+    '태그: '+(sv.tag||''),
+    '---',
+    sv.note||''
+  ].join('\n');
+}
+function buildPhotoCSV(arr){
+  var rows=['\uFEFF유형,ID,제목,조사일,위도,경도,위치출처,CPTED원칙,취약도,태그,설명'];
+  arr.forEach(function(p){
+    rows.push(['사진',p.id,p.name,p.date||'',p.lat||'',p.lng||'',
+      p.gpsSource||'',(p.cats||[]).join('|'),p.rating||0,
+      (p.tags||[]).join('|'),p.desc||''].map(escCSV).join(','));
+  });
+  return rows.join('\n');
+}
+function buildSurveyCSV(arr){
+  var rows=['\uFEFF유형,ID,제목,일시,위도,경도,위치출처,태그,메모'];
+  arr.forEach(function(sv){
+    rows.push(['노트',sv.id,sv.title,sv.time||'',sv.lat||'',sv.lng||'',
+      sv.gpsSource||'',sv.tag||'',sv.note||''].map(escCSV).join(','));
+  });
+  return rows.join('\n');
+}
+
+function loadJSZip(cb){
+  if(window.JSZip){cb(window.JSZip);return;}
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+  s.onload=function(){cb(window.JSZip);};
+  s.onerror=function(){toast('❌ JSZip 로드 실패 — 인터넷 연결 확인');};
+  document.head.appendChild(s);
+}
+
+async function exportAll(){
+  var total=photos.length+surveys.length;
+  if(!total){toast('내보낼 데이터가 없습니다');return;}
+  toast('📦 내보내기 준비 중...');
+  pb(0.05);
+  loadJSZip(async function(JSZip){
+    try{
+      var zip=new JSZip();
+      var ts=new Date().toISOString().slice(0,10).replace(/-/g,'');
+      var base='CPTED_'+ts;
+      var pFolder=zip.folder(base+'/사진');
+      var nFolder=zip.folder(base+'/노트');
+
+      // 사진: XMP 재삽입 JPEG
+      for(var i=0;i<photos.length;i++){
+        var p=photos[i];
+        pb(0.1+(i/Math.max(photos.length,1))*0.5);
+        try{
+          var safeName=(p.name||'사진').slice(0,40).replace(/[\\/:*?"<>|]/g,'_');
+          var blob=dataUrlToBlob(p.dataUrl);
+          var xmp=buildXMPPacket({title:p.name,description:p.desc||'',tags:p.tags||[],rating:p.rating||0,
+            location:p.lat?p.lat.toFixed(6)+','+p.lng.toFixed(6):''});
+          var annotated;
+          try{annotated=await injectXMPIntoJPEG(blob,xmp);}catch(_){annotated=blob;}
+          pFolder.file(base+'_'+safeName+'.jpg', await annotated.arrayBuffer());
+        }catch(e){console.warn('photo export',e);}
+      }
+
+      // 노트: TXT
+      pb(0.65);
+      surveys.forEach(function(sv){
+        var safeName=(sv.title||'노트').slice(0,40).replace(/[\\/:*?"<>|]/g,'_');
+        nFolder.file(base+'_'+safeName+'.txt', buildSurveyTxt(sv));
+      });
+
+      // CSV
+      pb(0.8);
+      if(photos.length)  zip.file(base+'/사진_목록.csv',  buildPhotoCSV(photos));
+      if(surveys.length) zip.file(base+'/노트_목록.csv', buildSurveyCSV(surveys));
+
+      // ZIP 생성 및 다운로드
+      pb(0.9);
+      var zipBlob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(zipBlob);
+      a.download=base+'.zip';
+      a.click();
+      setTimeout(function(){URL.revokeObjectURL(a.href);},5000);
+
+      pb(1); setTimeout(function(){pb(0);},600);
+      toast('✅ 내보내기 완료! ('+photos.length+'장 + '+surveys.length+'건)');
+
+      // 초기화 확인
+      setTimeout(function(){
+        if(confirm('내보내기 완료!\n\n앱의 현장 기록을 초기화할까요?\n사진 '+photos.length+'개 + 노트 '+surveys.length+'건\n\n※ 저장된 ZIP 파일은 사라지지 않습니다.')){
+          clearAllData();
+        }
+      },600);
+    }catch(err){
+      pb(0); toast('❌ 내보내기 실패: '+err.message);
+    }
+  });
+}
+
+function clearAllData(){
+  LAYERS.photo.mkrs.forEach(function(m){map.removeLayer(m);}); LAYERS.photo.mkrs=[]; LAYERS.photo.cnt=0;
+  LAYERS.survey.mkrs.forEach(function(m){map.removeLayer(m);}); LAYERS.survey.mkrs=[]; LAYERS.survey.cnt=0;
+  photos=[]; surveys=[];
+  idbClear('photos'); idbClear('surveys');
+  updCounts(); closeAll(); toast('🗑 초기화 완료');
+}
+
+// ── 구조화된 설명 파싱 (불러오기용)
+function parseStructuredDesc(desc){
+  var r={cats:[],rating:0,tags:[],lat:null,lng:null,date:'',memo:''};
+  if(!desc) return r;
+  var parts=String(desc).split('---');
+  if(parts[1]) r.memo=parts[1].trim();
+  parts[0].split('\n').forEach(function(line){
+    var m;
+    if((m=line.match(/^원칙:\s*(.+)/)))    r.cats=m[1].split(',').map(function(s){return s.trim();}).filter(Boolean);
+    if((m=line.match(/\((\d)\/5\)/)))       r.rating=parseInt(m[1]);
+    if((m=line.match(/^태그:\s*(.+)/)))     r.tags=m[1].split(',').map(function(s){return s.trim();}).filter(Boolean);
+    if((m=line.match(/^위치:\s*([\d.]+),\s*([\d.]+)/))){ r.lat=parseFloat(m[1]); r.lng=parseFloat(m[2]); }
+    if((m=line.match(/^조사일:\s*(.+)/)))   r.date=m[1].trim();
+  });
+  return r;
+}
+
+function parseSurveyTxt(text){
+  var data={}, memo=[], inMemo=false;
+  text.split('\n').forEach(function(line){
+    if(line.indexOf('===')===0) return;
+    if(line.trim()==='---'){inMemo=true;return;}
+    if(inMemo){memo.push(line);return;}
+    var m=line.match(/^([^:]+):\s*(.*)/);
+    if(m) data[m[1].trim()]=m[2].trim();
+  });
+  return {
+    id:'sv'+Date.now()+'_'+Math.random().toString(36).slice(2,5),
+    title:data['제목']||'불러온 노트',
+    note:memo.join('\n').trim(),
+    tag:data['태그']||'',
+    lat:data['위도']?parseFloat(data['위도']):null,
+    lng:data['경도']?parseFloat(data['경도']):null,
+    gpsSource:data['위치출처']||'복원',
+    time:data['일시']||new Date().toLocaleString('ko-KR'),
+    photo:null
+  };
+}
+
+async function importFromFiles(files){
+  var arr=Array.from(files);
+  if(!arr.length) return;
+  toast('📥 불러오는 중...');
+  pb(0.05);
+  var cnt={p:0,s:0,e:0};
+  var newPts=[];
+
+  for(var i=0;i<arr.length;i++){
+    var f=arr[i];
+    pb(0.05+(i/arr.length)*0.9);
+    try{
+      if(f.type.startsWith('image/')||f.name.match(/\.jpe?g$/i)){
+        // ── JPEG 불러오기
+        var dataUrl=await toDataURL(f);
+        var ex={};
+        try{ex=await exifr.parse(f,{gps:true,xmp:true,ifd0:true})||{};}catch(_){}
+
+        // 제목
+        var title='';
+        if(ex.Title) title=ex.Title;
+        else if(ex.dc&&ex.dc.title) title=typeof ex.dc.title==='object'?(ex.dc.title['x-default']||Object.values(ex.dc.title)[0]):ex.dc.title;
+        if(!title) title=f.name.replace(/\.[^.]+$/,'').replace(/[_-]/g,' ');
+
+        // 설명 (exif:UserComment 또는 dc:description)
+        var desc='';
+        if(ex.UserComment) desc=typeof ex.UserComment==='object'?(ex.UserComment['x-default']||Object.values(ex.UserComment)[0]||''):String(ex.UserComment);
+        if(!desc&&ex.dc&&ex.dc.description) desc=typeof ex.dc.description==='object'?(ex.dc.description['x-default']||Object.values(ex.dc.description)[0]):ex.dc.description;
+
+        var parsed=parseStructuredDesc(desc);
+
+        // 태그
+        var tags=parsed.tags;
+        if(!tags.length){
+          var kw=ex.Keywords||ex.dc&&ex.dc.subject;
+          if(kw) tags=Array.isArray(kw)?kw:[kw];
+        }
+
+        // GPS: EXIF 우선, 없으면 설명에서 파싱한 값
+        var lat=ex.latitude!=null?ex.latitude:parsed.lat;
+        var lng=ex.longitude!=null?ex.longitude:parsed.lng;
+
+        var p={
+          id:'p'+Date.now()+'_'+i,
+          name:title.trim(),
+          desc:desc, memo:parsed.memo,
+          tags:tags, cats:parsed.cats,
+          rating:parsed.rating||ex.Rating||0,
+          dataUrl:dataUrl,
+          lat:lat, lng:lng,
+          gpsSource:ex.latitude!=null?'EXIF GPS':'복원',
+          date:parsed.date||new Date().toLocaleDateString('ko-KR'),
+          hasXmp:true
+        };
+        // 중복 확인 (제목+날짜 동일)
+        if(!photos.find(function(ep){return ep.name===p.name&&ep.date===p.date;})){
+          photos.push(p);
+          await idbPut('photos',p);
+          if(p.lat){addMkr('photo',mkPhotoMkr(p)); newPts.push([p.lat,p.lng]);}
+          cnt.p++;
+        }
+      } else if(f.name.match(/\.txt$/i)){
+        // ── TXT 불러오기
+        var text=await f.text();
+        if(text.indexOf('CPTED 현장노트')<0) continue;
+        var sv=parseSurveyTxt(text);
+        if(!surveys.find(function(es){return es.title===sv.title&&es.time===sv.time;})){
+          surveys.push(sv);
+          await idbPut('surveys',sv);
+          if(sv.lat){addMkr('survey',mkSurveyMkr(sv)); newPts.push([sv.lat,sv.lng]);}
+          cnt.s++;
+        }
+      }
+    }catch(e){console.warn('import',f.name,e); cnt.e++;}
+  }
+
+  pb(1); setTimeout(function(){pb(0);},500);
+  updCounts();
+
+  var msg='📥 복원 완료: 사진 '+cnt.p+'개, 노트 '+cnt.s+'건';
+  if(cnt.e) msg+=' (오류 '+cnt.e+'건)';
+  toast(msg);
+
+  if(newPts.length){
+    setTimeout(function(){ map.fitBounds(newPts,{padding:[40,80]}); },400);
+  }
 }
 
 // ══ GLOBAL (for onclick in info cards) ══
