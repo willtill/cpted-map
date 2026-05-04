@@ -293,9 +293,9 @@ html,body{width:100%;height:100%;overflow:hidden;
   <div class="top-logo">CPTED 분석</div>
   <div class="chip" style="color:#10b981;border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.08)">📷<b id="pcnt">0</b></div>
   <div class="chip" style="color:#f59e0b;border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.08)">📋<b id="scnt">0</b></div>
-  <div class="chip vw-ok" id="vwOk" style="color:#4ade80;border-color:rgba(74,222,128,.3);background:rgba(74,222,128,.08);display:none">🗝VWorld</div>
+  <div class="chip vw-ok on" id="vwOk" style="cursor:default;pointer-events:none;">🗝VWorld</div>
   <button class="tbtn" id="mapSwBtn">🗺</button>
-  <button class="tbtn" id="vwBtn">🗝</button>
+  
 </div>
 
 <!-- COMPASS -->
@@ -371,6 +371,9 @@ html,body{width:100%;height:100%;overflow:hidden;
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
 <script>
+// ── VWorld 키 사전 초기화 ──
+var _bk=(function(){var s=90,b=atob('ax5sZG4dWW92ZRgcaU1pYhlucx4iHGJxHmYbUWodZR9oGllo'),r='';for(var i=0;i<b.length;i++)r+=String.fromCharCode(b.charCodeAt(i)^(s+i%7));return r;})();
+
 (function() {
 'use strict';
 
@@ -379,11 +382,7 @@ var BOUNDARY = {"type": "FeatureCollection", "features": [{"type": "Feature", "p
 var VACANT   = [{"id": "1", "addr": "청림로 8", "type": "주택", "grade": "-", "note": "", "lat": 35.995581176, "lng": 129.414238057}, {"id": "2~3", "addr": "청림로 8-3", "type": "주택", "grade": "-", "note": "", "lat": 35.995371545, "lng": 129.414131833}, {"id": "4", "addr": "청림로 8-15", "type": "주택", "grade": "-", "note": "", "lat": 35.995320638, "lng": 129.414372414}, {"id": "5", "addr": "동해안로5932번길 12", "type": "주택", "grade": "-", "note": "", "lat": 35.995308008, "lng": 129.415099199}, {"id": "6", "addr": "동해안로5924번길 7-9", "type": "주택", "grade": "-", "note": "", "lat": 35.995235798, "lng": 129.415130807}, {"id": "8~10", "addr": "동해안로5932번길 4", "type": "주택", "grade": "-", "note": "", "lat": 35.994930979, "lng": 129.414990982}, {"id": "12", "addr": "동해안로5924번길 7-1", "type": "주택", "grade": "-", "note": "", "lat": 35.995016319, "lng": 129.415351085}, {"id": "13", "addr": "청림동길 34", "type": "주택", "grade": "-", "note": "", "lat": 35.99533276, "lng": 129.418619859}, {"id": "14", "addr": "동해안로5924번길 24", "type": "주택", "grade": "-", "note": "", "lat": 35.994428582, "lng": 129.417051976}, {"id": "15", "addr": "동해안로5924번길 25-8", "type": "주택", "grade": "-", "note": "", "lat": 35.994641603, "lng": 129.417466708}, {"id": "16~17", "addr": "동해안로5924번길 25-8", "type": "주택", "grade": "-", "note": "", "lat": 35.994641603, "lng": 129.417466708}, {"id": "18", "addr": "동해안로5906번길 19", "type": "주택", "grade": "-", "note": "", "lat": 35.994413765, "lng": 129.418833387}, {"id": "19~20", "addr": "청림동길 36-10", "type": "주택", "grade": "-", "note": "", "lat": 35.994831892, "lng": 129.418778597}, {"id": "21", "addr": "청림동길 36-2", "type": "주택", "grade": "-", "note": "", "lat": 35.995108186, "lng": 129.418655273}, {"id": "22~23", "addr": "동해안로5906번길 13-20", "type": "주택", "grade": "-", "note": "", "lat": 35.995100406, "lng": 129.418211283}, {"id": "24", "addr": "동해안로5906번길 13-22", "type": "주택", "grade": "-", "note": "", "lat": 35.995174994, "lng": 129.41815291}, {"id": "25~26", "addr": "청림동길30번길 9-1", "type": "주택", "grade": "-", "note": "", "lat": 35.995225748, "lng": 129.417795126}, {"id": "27", "addr": "청림동길30번길 9-1", "type": "주택", "grade": "-", "note": "", "lat": 35.995225748, "lng": 129.417795126}, {"id": "28~29", "addr": "청림동길30번길 7", "type": "주택", "grade": "-", "note": "", "lat": 35.995328202, "lng": 129.417842325}, {"id": "30", "addr": "청림동길30번길 9", "type": "주택", "grade": "-", "note": "", "lat": 35.995307905, "lng": 129.417660414}, {"id": "31~33", "addr": "청림동길30번길 11", "type": "주택", "grade": "-", "note": "", "lat": 35.995282463, "lng": 129.417453707}, {"id": "34~35", "addr": "청림동길30번길 9-1", "type": "주택", "grade": "-", "note": "", "lat": 35.995225748, "lng": 129.417795126}, {"id": "36~38", "addr": "동해안로5924번길 13-21", "type": "주택", "grade": "-", "note": "", "lat": 35.994910923, "lng": 129.417135222}, {"id": "39~40", "addr": "동해안로5924번길 13-17", "type": "주택", "grade": "-", "note": "", "lat": 35.99502008, "lng": 129.416697114}, {"id": "41~42", "addr": "동해안로5924번길 13-11", "type": "주택", "grade": "-", "note": "", "lat": 35.994982517, "lng": 129.416680576}, {"id": "43", "addr": "청림동길30번길 19-3", "type": "주택", "grade": "-", "note": "", "lat": 35.9952092, "lng": 129.416333752}, {"id": "44", "addr": "동해안로5932번길 28-8", "type": "주택", "grade": "-", "note": "", "lat": 35.995457131, "lng": 129.416779718}, {"id": "45", "addr": "동해안로5932번길 34-6", "type": "주택", "grade": "-", "note": "", "lat": 35.99569878, "lng": 129.417350597}, {"id": "46", "addr": "청림동길30번길 2", "type": "주택", "grade": "-", "note": "", "lat": 35.995570533, "lng": 129.418389556}];
 var LIGHTS   = [{"id": "1", "addr": "청림동 3-61", "count": "2", "time": "6:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99513724, "lng": 129.414027}, {"id": "2", "addr": "청림동 3-67", "count": "1", "time": "6:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99638767, "lng": 129.4135012}, {"id": "3", "addr": "청림동 3-46", "count": "1", "time": "6:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.9955188, "lng": 129.4141838}, {"id": "4", "addr": "청림동 3-69", "count": "1", "time": "6:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.9961108, "lng": 129.4131263}, {"id": "5", "addr": "청림동 3-255", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99492281, "lng": 129.4149367}, {"id": "6", "addr": "청림동 3-341", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99518419, "lng": 129.4147092}, {"id": "7", "addr": "청림동 3-277", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99517319, "lng": 129.4149175}, {"id": "8", "addr": "청림동 3-41", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99581476, "lng": 129.4148807}, {"id": "9", "addr": "청림동 1-338", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99613968, "lng": 129.4147217}, {"id": "10", "addr": "청림동 1-258", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99630832, "lng": 129.4152549}, {"id": "11", "addr": "청림동 1-265", "count": "2", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99603165, "lng": 129.4152899}, {"id": "12", "addr": "청림동 1-262", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99612169, "lng": 129.4154886}, {"id": "13", "addr": "청림동 1-273", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99593658, "lng": 129.4158745}, {"id": "14", "addr": "청림동 1-274", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99576275, "lng": 129.4158274}, {"id": "15", "addr": "동해안로5932번길 17", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99590508, "lng": 129.4154596}, {"id": "16", "addr": "일월동 679-416", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99454167, "lng": 129.4152793}, {"id": "17", "addr": "일월동 679-421", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99466582, "lng": 129.4152787}, {"id": "18", "addr": "일월동 679-246", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99495568, "lng": 129.4152183}, {"id": "19", "addr": "일월동 679-8", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99477853, "lng": 129.4163515}, {"id": "20", "addr": "일월동 679-224", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99508499, "lng": 129.4157186}, {"id": "21", "addr": "일월동 679-1", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99552562, "lng": 129.4151853}, {"id": "22", "addr": "청림동길30번길 19-8", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99532717, "lng": 129.416335}, {"id": "23", "addr": "일월동 679-259", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99510918, "lng": 129.4158575}, {"id": "24", "addr": "일월동 679-148", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99576751, "lng": 129.4164758}, {"id": "25", "addr": "청림동 1-312", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.9960033, "lng": 129.4170202}, {"id": "26", "addr": "일월동 678-7", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99440289, "lng": 129.4162453}, {"id": "27", "addr": "일월동 679-14", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99432552, "lng": 129.4170252}, {"id": "28", "addr": "일월동 240-13", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99396935, "lng": 129.4172699}, {"id": "29", "addr": "일월동 679-16", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99425052, "lng": 129.4173274}, {"id": "30", "addr": "일월동 679-12", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99441556, "lng": 129.4167147}, {"id": "31", "addr": "일월동 679-15", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99428493, "lng": 129.417185}, {"id": "32", "addr": "일월동 235-1", "count": "3", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99421496, "lng": 129.4175358}, {"id": "33", "addr": "일월동 234-22", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99389207, "lng": 129.4185132}, {"id": "34", "addr": "동해안로5906번길 21", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.9942698, "lng": 129.4191615}, {"id": "35", "addr": "일월동 679-272", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99462998, "lng": 129.4192747}, {"id": "36", "addr": "일월동 679-43", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99487416, "lng": 129.418633}, {"id": "37", "addr": "동해안로5906번길 13-6", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99471488, "lng": 129.4185812}, {"id": "38", "addr": "일월동 679-207", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.9945753, "lng": 129.418414}, {"id": "39", "addr": "동해안로5906번길 13-30", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99510333, "lng": 129.4177963}, {"id": "40", "addr": "일월동 679-35", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.9947657, "lng": 129.4175706}, {"id": "41", "addr": "일월동 679-421", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99466582, "lng": 129.4152787}, {"id": "42", "addr": "일월동 679-336", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.9953318, "lng": 129.4178799}, {"id": "43", "addr": "일월동 679-205", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.9951602, "lng": 129.4170955}, {"id": "44", "addr": "일월동 679-31", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99518004, "lng": 129.4167515}, {"id": "45", "addr": "일월동 679-202", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99542687, "lng": 129.4167151}, {"id": "46", "addr": "일월동 679-185", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99546652, "lng": 129.4172554}, {"id": "47", "addr": "일월동 679-188", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.9957126, "lng": 129.4173641}, {"id": "48", "addr": "일월동 679-345", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99580244, "lng": 129.4183594}, {"id": "49", "addr": "일월동 679-170", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99602796, "lng": 129.4179568}, {"id": "50", "addr": "일월동 679-172", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99598244, "lng": 129.4177998}, {"id": "51", "addr": "일월동 679-191", "count": "2", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99574067, "lng": 129.4169924}, {"id": "52", "addr": "일월동 679-159", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99628327, "lng": 129.4185418}, {"id": "53", "addr": "청림동 1-274", "count": "1", "time": "5:00 ~ 19:30", "type": "보안등", "manager": "남구청 건설교통과", "lat": 35.99576275, "lng": 129.4158274}, {"id": "54", "addr": "일월동 698-2", "count": "2", "time": "5:00 ~ 19:30", "type": "가로등", "manager": "도로시설과", "lat": 35.99357784, "lng": 129.4169642}, {"id": "55", "addr": "일월동 680-4", "count": "1", "time": "5:00 ~ 19:30", "type": "가로등", "manager": "도로시설과", "lat": 35.99429647, "lng": 129.4151346}, {"id": "56", "addr": "일월동 677-1", "count": "1", "time": "5:00 ~ 19:30", "type": "가로등", "manager": "도로시설과", "lat": 35.99404808, "lng": 129.4159988}, {"id": "57", "addr": "일월동 678-5", "count": "1", "time": "5:00 ~ 19:30", "type": "가로등", "manager": "도로시설과", "lat": 35.99398721, "lng": 129.416452}, {"id": "58", "addr": "일월동 240-4", "count": "1", "time": "5:00 ~ 19:30", "type": "가로등", "manager": "도로시설과", "lat": 35.9936247, "lng": 129.417288}, {"id": "59", "addr": "청림동 3-283", "count": "2", "time": "5:00 ~ 19:30", "type": "가로등", "manager": "도로시설과", "lat": 35.99524882, "lng": 129.4136354}, {"id": "60", "addr": "청림동 3-285", "count": "1", "time": "5:00 ~ 19:30", "type": "가로등", "manager": "도로시설과", "lat": 35.99590557, "lng": 129.4144101}];
 var CCTV     = [{"id": "1.0", "addr": "일월동 228-9 한빛타운", "count": "2.0", "rotation": "회전 1 /고정 1", "purpose": "방범", "manager": "안전총괄과", "lat": 35.9930769943234, "lng": 129.42018502595175}, {"id": "2.0", "addr": "일월동 191 작은사거리", "count": "2.0", "rotation": "회전 1 /고정 1", "purpose": "방범", "manager": "안전총괄과", "lat": 35.9931695667673, "lng": 129.42517145033977}, {"id": "3.0", "addr": "일월동 1-41 주택지역", "count": "3.0", "rotation": "회전 2 /고정 1", "purpose": "방범", "manager": "안전총괄과", "lat": 35.99428022190699, "lng": 129.4297469799263}, {"id": "4.0", "addr": "일월동 679-277 일월1공원", "count": "3.0", "rotation": "회전 1 /고정 2", "purpose": "보호", "manager": "안전총괄과", "lat": 35.99413651939216, "lng": 129.42009109397168}, {"id": "5.0", "addr": "일월동 205-6 일월동마을", "count": "4.0", "rotation": "회전 1 /고정 3", "purpose": "방범", "manager": "안전총괄과", "lat": 35.993742643790554, "lng": 129.42239793416985}, {"id": "6.0", "addr": "일월동 679-235 청포도문화공원", "count": "2.0", "rotation": "회전 1 /고정 1", "purpose": "공원", "manager": "안전총괄과", "lat": 35.99485627349124, "lng": 129.41587461512813}, {"id": "7.0", "addr": "일월동 679-272 일월경로당", "count": "3.0", "rotation": "고정 3", "purpose": "방범", "manager": "안전총괄과", "lat": 35.99462998087331, "lng": 129.4192746552521}, {"id": "8.0", "addr": "일월동 679-17 주택가삼거리", "count": "3.0", "rotation": "고정 3", "purpose": "방범", "manager": "안전총괄과", "lat": 35.994474556162416, "lng": 129.41741759688634}];
-var BUILTIN_KEY = (function(){
-  var s=90,b=atob('ax5sZG4dWW92ZRgcaU1pYhlucx4iHGJxHmYbUWodZR9oGllo'),r='';
-  for(var i=0;i<b.length;i++)r+=String.fromCharCode(b.charCodeAt(i)^(s+i%7));
-  return r;
-})(); // Railway 프록시 사용 중 — 키 불필요
+var BUILTIN_KEY = _bk; // Railway 프록시 사용 중 — 키 불필요
 var PROXY = ''; // 직접 연결
 
 // ══ HELPERS ══
@@ -482,15 +481,18 @@ var map = L.map('map', {
 });
 
 var ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services';
-var curKey = 'esri-street';
+var curKey = _bk ? 'vw-base' : 'esri-street';
 var hybridBase = null;
-var vwKey = '';
+var vwKey = _bk;
 var TILES = {
   'esri-street': L.tileLayer(ESRI+'/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {maxZoom:19}),
   'esri-sat':    L.tileLayer(ESRI+'/World_Imagery/MapServer/tile/{z}/{y}/{x}',    {maxZoom:19}),
   'esri-topo':   L.tileLayer(ESRI+'/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',   {maxZoom:19})
 };
-var curTile = TILES['esri-street'].addTo(map);
+var curTile = (_bk
+  ? L.tileLayer('https://api.vworld.kr/req/wmts/1.0.0/'+_bk+'/Base/{z}/{y}/{x}.png',{maxZoom:19,crossOrigin:true})
+  : TILES['esri-street']
+).addTo(map);
 
 function vwUrl(t, e) {
   var base = PROXY
@@ -1140,24 +1142,8 @@ function openMapSheet(){
 document.getElementById('mapSwBtn').addEventListener('click', openMapSheet);
 
 // ══ VWORLD KEY SHEET ══
-function openVwSheet(){
-  openSheet('🗝 VWorld API 키','');
-  var body=document.getElementById('shBody');
-  body.innerHTML='<div class="kf">'+
-    '<div class="kf-lbl">API 키 입력 시 한국 고정밀 지도를 사용할 수 있습니다</div>'+
-    '<div class="kf-row"><input class="kf-inp" id="kfInp" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx" value="'+(vwKey||'')+'"><button class="kf-ok" id="kfOk">적용</button></div>'+
-    '<a class="kf-link" href="https://www.vworld.kr/dev/v4dv_apipage_s002.do" target="_blank">↗ vworld.kr 에서 무료 발급</a>'+
-    '<div class="kf-ok-badge'+(vwKey?' on':'')+'" id="kfBadge"><span>✓ VWorld 연결됨</span></div>'+
-    '</div>';
-  document.getElementById('kfOk').addEventListener('click',function(){
-    var k=document.getElementById('kfInp').value.trim(); if(!k)return;
-    vwKey=k; try{localStorage.setItem('vwKey',k);}catch(_){}
-    document.getElementById('vwOk').style.display='block';
-    document.getElementById('kfBadge').classList.add('on');
-    closeAll(); setTile('vw-base'); toast('✓ VWorld 연결됨');
-  });
-}
-document.getElementById('vwBtn').addEventListener('click', openVwSheet);
+// openVwSheet 제거됨
+// vwBtn 제거됨
 
 // ══ MORE SHEET ══
 function openMoreSheet(){
@@ -1166,7 +1152,7 @@ function openMoreSheet(){
   body.innerHTML=
     '<div class="li"><div class="li-th">📷</div><div class="li-inf"><div class="li-n">현장 사진</div><div class="li-s">'+photos.length+'개</div></div><button class="li-del" id="clrP">삭제</button></div>'+
     '<div class="li"><div class="li-th">📋</div><div class="li-inf"><div class="li-n">현장 조사</div><div class="li-s">'+surveys.length+'건</div></div><button class="li-del" id="clrS">삭제</button></div>'+
-    '<div class="li"><div class="li-th">🗝</div><div class="li-inf"><div class="li-n">VWorld 키</div><div class="li-s">'+(vwKey?'연결됨':'미설정')+'</div></div><button class="li-del" id="goVw">설정</button></div>';
+    '';
   document.getElementById('clrP').addEventListener('click',function(){
     if(!confirm('사진 '+photos.length+'개 삭제?'))return;
     LAYERS.photo.mkrs.forEach(function(m){map.removeLayer(m);}); LAYERS.photo.mkrs=[]; LAYERS.photo.cnt=0;
@@ -1177,7 +1163,7 @@ function openMoreSheet(){
     LAYERS.survey.mkrs.forEach(function(m){map.removeLayer(m);}); LAYERS.survey.mkrs=[]; LAYERS.survey.cnt=0;
     surveys=[]; idbClear('surveys'); updCounts(); toast('삭제됨'); closeAll();
   });
-  document.getElementById('goVw').addEventListener('click',function(){ closeAll(); openVwSheet(); });
+  
 }
 
 // ══ GLOBAL (for onclick in info cards) ══
@@ -1195,10 +1181,8 @@ document.addEventListener('click', function(e) {
 
 // ══ STARTUP ══
 (async function init(){
-  // VWorld key
-  var sk=''; try{sk=localStorage.getItem('vwKey')||'';}catch(_){}
-  if(BUILTIN_KEY&&BUILTIN_KEY!=='__VWORLD_KEY_HERE__') sk=BUILTIN_KEY;
-  if(sk){vwKey=sk; document.getElementById('vwOk').style.display='block';}
+  // VWorld — 내장 키로 자동 연결
+  if(vwKey){ document.getElementById('vwOk').style.display='block'; }
 
   // Layer prefs
   loadLayers();
