@@ -373,6 +373,8 @@ html,body{width:100%;height:100%;overflow:hidden;
 <script>
 // ── VWorld 키 사전 초기화 ──
 var _bk=(function(){var s=90,b=atob('ax5sZG4dWW92ZRgcaU1pYhlucx4iHGJxHmYbUWodZR9oGllo'),r='';for(var i=0;i<b.length;i++)r+=String.fromCharCode(b.charCodeAt(i)^(s+i%7));return r;})();
+// ── SafeMap 키 사전 초기화 ──
+var _sk=(function(){var s=73,b=atob('CBANfnoffQJhDBMMeWEMEwx5YQwTDHlhDBMMeXsbfgN/fA=='),r='';for(var i=0;i<b.length;i++)r+=String.fromCharCode(b.charCodeAt(i)^(s+i%5));return r;})();
 
 (function() {
 'use strict';
@@ -642,13 +644,16 @@ var LAYERS = {
   cctv:    {id:'cctv',    name:'CCTV',        color:'#3b82f6',icon:'📹',visible:true,opacity:1, sz:1,mkrs:[],cnt:0},
   photo:   {id:'photo',   name:'현장 사진',   color:'#10b981',icon:'📷',visible:true,opacity:1, sz:1,mkrs:[],cnt:0},
   survey:  {id:'survey',  name:'현장 조사',   color:'#a855f7',icon:'📋',visible:true,opacity:1, sz:1,mkrs:[],cnt:0},
+  safemap: {id:'safemap', name:'범죄주의구간',color:'#dc2626',icon:'🛡',visible:false,opacity:.6,sz:1,mkrs:[],cnt:0,wms:null,info:'경찰청 5대 범죄 밀도'},
 };
-var L_ORDER = ['survey','photo','cctv','light','vacant','boundary'];
+// 점 마커들이 위에 보이도록 safemap을 boundary 바로 앞(아래 레이어)에 배치
+var L_ORDER = ['survey','photo','cctv','light','vacant','boundary','safemap'];
 var L_BASE  = {vacant:20, light:20, cctv:20, photo:42, survey:32, boundary:0};
 
 function applyVis(id) {
   var ly = LAYERS[id];
   if (id==='boundary' && ly.leaf) { ly.visible ? map.addLayer(ly.leaf) : map.removeLayer(ly.leaf); return; }
+  if (id==='safemap'  && ly.wms ) { ly.visible ? map.addLayer(ly.wms)  : map.removeLayer(ly.wms);  return; }
   ly.mkrs.forEach(function(m){ ly.visible ? map.addLayer(m) : map.removeLayer(m); });
 }
 function addMkr(id, m) {
@@ -660,7 +665,8 @@ function addMkr(id, m) {
 }
 function setLayerOp(id, v) {
   LAYERS[id].opacity = v;
-  if (id==='boundary' && LAYERS[id].leaf) { LAYERS[id].leaf.setStyle({fillOpacity:v*.4,opacity:v}); return; }
+  if (id==='boundary' && LAYERS[id].leaf) { LAYERS[id].leaf.setStyle({fillOpacity:v*.4,opacity:v}); saveLayers(); return; }
+  if (id==='safemap'  && LAYERS[id].wms)  { LAYERS[id].wms.setOpacity(v); saveLayers(); return; }
   LAYERS[id].mkrs.forEach(function(m){ var e=m.getElement(); if(e) e.style.opacity=v; });
   saveLayers();
 }
@@ -687,6 +693,38 @@ function saveLayers() {
 function loadLayers() {
   var s = lsLoad('ly3', null); if (!s) return;
   Object.keys(s).forEach(function(k){if(LAYERS[k]){LAYERS[k].visible=s[k].visible;LAYERS[k].opacity=s[k].opacity;LAYERS[k].sz=s[k].sz||1;}});
+}
+
+// ══ SAFEMAP WMS (범죄주의구간) ══
+// CPTED 분석 baseline: 경찰청 5대 범죄 행정구역별 격자 밀도 (objtId=205, IF_0087_WMS)
+function initSafemap() {
+  if (!_sk) {
+    console.log('[SafeMap] 키 미설정 — 임베드 후 사용 가능');
+    return;
+  }
+  // serviceKey 는 base URL 에 직접 박아서 케이스 보존 (Leaflet WMS 옵션 충돌 방지)
+  var url = 'https://www.safemap.go.kr/openapi2/IF_0087_WMS?serviceKey=' + encodeURIComponent(_sk);
+  var wms = L.tileLayer.wms(url, {
+    layers:      'A2SM_CRMNLHSPOT_TOT',
+    styles:      'A2SM_CrmnlHspot_Tot_Tot',
+    format:      'image/png',
+    transparent: true,
+    version:     '1.1.1',
+    opacity:     LAYERS.safemap.opacity,
+    attribution: '© 경찰청 · 생활안전지도',
+    pane:        'tilePane',
+    zIndex:      200
+  });
+  // 키 오류 감지 — 첫 실패 시 1회만 안내
+  var errOnce = false;
+  wms.on('tileerror', function(){
+    if (errOnce) return;
+    errOnce = true;
+    toast('⚠ 범죄주의구간 타일 오류 — 키 또는 도메인 제한 확인', 4000);
+  });
+  LAYERS.safemap.wms = wms;
+  LAYERS.safemap.cnt = 1;
+  // visible 은 loadLayers() 가 복원한 값 그대로 — applyVis 가 처리
 }
 
 // ══ ICON HELPERS ══
@@ -1096,12 +1134,12 @@ function openLayerSheet(){
 function buildLP(){
   var body=document.getElementById('shBody'); if(!body) return; body.innerHTML='';
   L_ORDER.forEach(function(id){
-    var ly=LAYERS[id], hasSz=(id!=='boundary');
+    var ly=LAYERS[id], hasSz=(id!=='boundary' && id!=='safemap');
     var row=document.createElement('div'); row.className='lp-row';
     row.innerHTML=
       '<div class="lp-eye'+(ly.visible?'':' off')+'" data-id="'+id+'">👁</div>'+
       '<div class="lp-col" style="background:'+ly.color+'"></div>'+
-      '<div class="lp-inf"><div class="lp-n">'+ly.icon+' '+ly.name+'</div><div class="lp-c">'+ly.cnt+'개</div></div>'+
+      '<div class="lp-inf"><div class="lp-n">'+ly.icon+' '+ly.name+'</div><div class="lp-c">'+(id==='safemap'?(ly.wms?'활성 · 격자':'키 미설정'):(ly.cnt+'개'))+'</div></div>'+
       '<div class="lp-sls">'+
         '<div class="lp-sl-row"><span class="lp-sl-l">투명</span><span class="lp-sl-v" id="ov-'+id+'">'+(Math.round(ly.opacity*100))+'%</span><input class="lp-sl" type="range" min="0" max="1" step=".05" value="'+ly.opacity+'" data-id="'+id+'" data-tp="op"></div>'+
         (hasSz?'<div class="lp-sl-row"><span class="lp-sl-l">크기</span><span class="lp-sl-v" id="sv-'+id+'">'+(Math.round(ly.sz*100))+'%</span><input class="lp-sl" type="range" min=".3" max="3" step=".1" value="'+ly.sz+'" data-id="'+id+'" data-tp="sz"></div>':'')+
@@ -1188,7 +1226,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  initBoundary(); initVacant(); initLights(); initCctv();
+  initBoundary(); initVacant(); initLights(); initCctv(); initSafemap();
 
   // Restore tile
   var st=lsLoad('tile','esri-street');
