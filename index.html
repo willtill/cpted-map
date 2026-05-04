@@ -1236,16 +1236,12 @@ function openPhotoMetaSheet(file, onNextCb) {
   });
 
   // ── JPEG 다운로드 버튼 (저장 후 활성화)
-  document.getElementById('pmDl').addEventListener('click', function() {
+  document.getElementById('pmDl').addEventListener('click', async function() {
     if (!pmDraft.annotatedBlob) return;
     var ts = new Date().toISOString().slice(0,19).replace(/[T:]/g,'').replace(/-/g,'');
     var safeName = (document.getElementById('pmTitle').value||'사진').slice(0,40).replace(/[\\/:*?"<>|]/g,'_');
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(pmDraft.annotatedBlob);
-    a.download = 'CPTED_' + ts + '_' + safeName + '.jpg';
-    a.click();
-    URL.revokeObjectURL(a.href);
-    toast('⬇ JPEG 저장됨');
+    await shareOrDownload(pmDraft.annotatedBlob, 'CPTED_' + ts + '_' + safeName + '.jpg', 'CPTED 현장사진');
+    toast('📤 저장 완료');
   });
 }
 
@@ -1384,12 +1380,8 @@ async function pmSave(onNextCb) {
     if (pmDraft.annotatedBlob) {
       var ts = new Date().toISOString().slice(0,10).replace(/-/g,'');
       var safeName = title.slice(0,40).replace(/[\\/:*?"<>|]/g,'_');
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(pmDraft.annotatedBlob);
-      a.download = 'CPTED_' + ts + '_' + safeName + '.jpg';
-      a.click();
-      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 3000);
-      toast('📷 저장 + XMP 삽입 완료');
+      await shareOrDownload(pmDraft.annotatedBlob, 'CPTED_' + ts + '_' + safeName + '.jpg', 'CPTED 현장사진');
+      toast('📷 저장 완료 (XMP 포함)');
     } else {
       toast('📷 저장 완료');
     }
@@ -1841,6 +1833,27 @@ function buildSurveyCSV(arr){
   return rows.join('\n');
 }
 
+
+// ── 공유/다운로드 통합 (iOS Share Sheet ↔ PC 다운로드 자동 전환)
+async function shareOrDownload(blob, filename, shareTitle) {
+  if (navigator.share && navigator.canShare) {
+    var file = new File([blob], filename, {type: blob.type});
+    if (navigator.canShare({files: [file]})) {
+      try {
+        await navigator.share({files: [file], title: shareTitle || filename});
+        return;
+      } catch(e) {
+        if (e.name === 'AbortError') return;
+      }
+    }
+  }
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+}
+
 function loadJSZip(cb){
   if(window.JSZip){cb(window.JSZip);return;}
   var s=document.createElement('script');
@@ -1893,11 +1906,7 @@ async function exportAll(){
       // ZIP 생성 및 다운로드
       pb(0.9);
       var zipBlob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
-      var a=document.createElement('a');
-      a.href=URL.createObjectURL(zipBlob);
-      a.download=base+'.zip';
-      a.click();
-      setTimeout(function(){URL.revokeObjectURL(a.href);},5000);
+      await shareOrDownload(zipBlob, base+'.zip', 'CPTED 현장기록 내보내기');
 
       pb(1); setTimeout(function(){pb(0);},600);
       toast('✅ 내보내기 완료! ('+photos.length+'장 + '+surveys.length+'건)');
