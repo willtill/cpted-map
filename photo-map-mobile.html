@@ -1835,8 +1835,13 @@ function buildSurveyCSV(arr){
 
 
 // ── 공유/다운로드 통합 (iOS Share Sheet ↔ PC 다운로드 자동 전환)
+function isMobileDevice(){
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && /Mac|iPad/i.test(navigator.userAgent));
+}
 async function shareOrDownload(blob, filename, shareTitle) {
-  if (navigator.share && navigator.canShare) {
+  // 모바일만 공유 시트 사용 (Windows PC share 제외)
+  if (isMobileDevice() && navigator.share && navigator.canShare) {
     var file = new File([blob], filename, {type: blob.type});
     if (navigator.canShare({files: [file]})) {
       try {
@@ -1847,6 +1852,7 @@ async function shareOrDownload(blob, filename, shareTitle) {
       }
     }
   }
+  // PC: 직접 다운로드
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename;
@@ -1866,61 +1872,95 @@ function loadJSZip(cb){
 async function exportAll(){
   var total=photos.length+surveys.length;
   if(!total){toast('내보낼 데이터가 없습니다');return;}
-  toast('📦 내보내기 준비 중...');
+  toast('📦 파일 준비 중...');
   pb(0.05);
-  loadJSZip(async function(JSZip){
-    try{
-      var zip=new JSZip();
-      var ts=new Date().toISOString().slice(0,10).replace(/-/g,'');
-      var base='CPTED_'+ts;
-      var pFolder=zip.folder(base+'/사진');
-      var nFolder=zip.folder(base+'/노트');
 
-      // 사진: XMP 재삽입 JPEG
-      for(var i=0;i<photos.length;i++){
-        var p=photos[i];
-        pb(0.1+(i/Math.max(photos.length,1))*0.5);
-        try{
-          var safeName=(p.name||'사진').slice(0,40).replace(/[\\/:*?"<>|]/g,'_');
-          var blob=dataUrlToBlob(p.dataUrl);
-          var xmp=buildXMPPacket({title:p.name,description:p.desc||'',tags:p.tags||[],rating:p.rating||0,
-            location:p.lat?p.lat.toFixed(6)+','+p.lng.toFixed(6):''});
-          var annotated;
-          try{annotated=await injectXMPIntoJPEG(blob,xmp);}catch(_){annotated=blob;}
-          pFolder.file(base+'_'+safeName+'.jpg', await annotated.arrayBuffer());
-        }catch(e){console.warn('photo export',e);}
-      }
+  try{
+    var ts=new Date().toISOString().slice(0,10).replace(/-/g,'');
+    var base='CPTED_'+ts;
+    var shareFiles=[];
 
-      // 노트: TXT
-      pb(0.65);
-      surveys.forEach(function(sv){
-        var safeName=(sv.title||'노트').slice(0,40).replace(/[\\/:*?"<>|]/g,'_');
-        nFolder.file(base+'_'+safeName+'.txt', buildSurveyTxt(sv));
-      });
-
-      // CSV
-      pb(0.8);
-      if(photos.length)  zip.file(base+'/사진_목록.csv',  buildPhotoCSV(photos));
-      if(surveys.length) zip.file(base+'/노트_목록.csv', buildSurveyCSV(surveys));
-
-      // ZIP 생성 및 다운로드
-      pb(0.9);
-      var zipBlob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
-      await shareOrDownload(zipBlob, base+'.zip', 'CPTED 현장기록 내보내기');
-
-      pb(1); setTimeout(function(){pb(0);},600);
-      toast('✅ 내보내기 완료! ('+photos.length+'장 + '+surveys.length+'건)');
-
-      // 초기화 확인
-      setTimeout(function(){
-        if(confirm('내보내기 완료!\n\n앱의 현장 기록을 초기화할까요?\n사진 '+photos.length+'개 + 노트 '+surveys.length+'건\n\n※ 저장된 ZIP 파일은 사라지지 않습니다.')){
-          clearAllData();
-        }
-      },600);
-    }catch(err){
-      pb(0); toast('❌ 내보내기 실패: '+err.message);
+    // ── 사진: XMP 재삽입 JPEG → File 객체
+    for(var i=0;i<photos.length;i++){
+      var p=photos[i];
+      pb(0.1+(i/Math.max(photos.length,1))*0.5);
+      try{
+        var safeName=(p.name||'사진').slice(0,40).replace(/[\/:*?"<>|]/g,'_');
+        var blob=dataUrlToBlob(p.dataUrl);
+        var xmp=buildXMPPacket({title:p.name,description:p.desc||'',tags:p.tags||[],
+          rating:p.rating||0,location:p.lat?p.lat.toFixed(6)+','+p.lng.toFixed(6):''});
+        var annotated;
+        try{annotated=await injectXMPIntoJPEG(blob,xmp);}catch(_){annotated=blob;}
+        shareFiles.push(new File([annotated], base+'_'+safeName+'.jpg',{type:'image/jpeg'}));
+      }catch(e){console.warn('photo',e);}
     }
-  });
+
+    // ── 노트: TXT → File 객체
+    pb(0.65);
+    surveys.forEach(function(sv){
+      var safeName=(sv.title||'노트').slice(0,40).replace(/[\/:*?"<>|]/g,'_');
+      shareFiles.push(new File([buildSurveyTxt(sv)], base+'_'+safeName+'.txt',{type:'text/plain'}));
+    });
+
+    // ── CSV → File 객체
+    pb(0.8);
+    if(photos.length)  shareFiles.push(new File([buildPhotoCSV(photos)],  base+'_사진목록.csv',{type:'text/csv'}));
+    if(surveys.length) shareFiles.push(new File([buildSurveyCSV(surveys)], base+'_노트목록.csv',{type:'text/csv'}));
+
+    pb(0.9);
+
+    // ── navigator.share() — 모바일(iOS·Android)만 사용
+    // Windows 11 Chrome/Edge도 share를 지원하므로 기기 판별 필요
+    function isMobile(){
+      return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        (navigator.maxTouchPoints > 1 && /Mac|iPad/i.test(navigator.userAgent));
+    }
+    var shared=false;
+    if(isMobile() && navigator.share && navigator.canShare && navigator.canShare({files:shareFiles})){
+      try{
+        await navigator.share({files:shareFiles, title:'CPTED 현장기록 '+ts});
+        shared=true;
+      }catch(e){
+        if(e.name==='AbortError'){pb(0);return;} // 사용자 취소
+        // 그 외 오류 → ZIP 폴백
+      }
+    }
+
+    // ── PC: ZIP 즉시 다운로드
+    if(!shared){
+      loadJSZip(async function(JSZip){
+        var zip=new JSZip();
+        shareFiles.forEach(function(f){
+          var ext=f.name.split('.').pop().toLowerCase();
+          var sub=ext==='jpg'?base+'/사진/':ext==='txt'?base+'/노트/':base+'/';
+          zip.file(sub+f.name, f);
+        });
+        var zipBlob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+        var a=document.createElement('a');
+        a.href=URL.createObjectURL(zipBlob);
+        a.download=base+'.zip';
+        a.click();
+        setTimeout(function(){URL.revokeObjectURL(a.href);},5000);
+        afterExport();
+      });
+      return;
+    }
+
+    afterExport();
+
+  }catch(err){
+    pb(0); toast('❌ 내보내기 실패: '+err.message);
+  }
+
+  function afterExport(){
+    pb(1); setTimeout(function(){pb(0);},500);
+    toast('✅ 내보내기 완료! ('+photos.length+'장 + '+surveys.length+'건)');
+    setTimeout(function(){
+      if(confirm('내보내기 완료!\n\n현장 기록을 초기화할까요?\n사진 '+photos.length+'개 + 노트 '+surveys.length+'건')){
+        clearAllData();
+      }
+    },500);
+  }
 }
 
 function clearAllData(){
