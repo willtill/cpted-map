@@ -730,7 +730,7 @@ var THEME_GROUPS = [
 ];
 
 var LAYERS = {
-  boundary:{id:'boundary',name:'청림동 경계',color:'#6366f1',icon:'🗂',visible:true,opacity:.5,sz:1,weight:2.5,leaf:null,mkrs:[],cnt:1, region:'pohang-nam'},
+  boundary:{id:'boundary',name:'청림동 경계',color:'#6366f1',icon:'🗂',visible:true,opacity:.25,sz:1,weight:3.0,leaf:null,mkrs:[],cnt:1, region:'pohang-nam'},
   vacant:  {id:'vacant',  name:'빈집',       color:'#f97316',icon:'🏚',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'pohang-nam'},
   light:   {id:'light',   name:'가로등',      color:'#f59e0b',icon:'💡',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'pohang-nam'},
   cctv:    {id:'cctv',    name:'CCTV',        color:'#3b82f6',icon:'📹',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'pohang-nam'},
@@ -742,7 +742,7 @@ var LAYERS = {
   safemap_burglary:  {id:'safemap_burglary',  name:'강도',           color:'#7c3aed', icon:'🥷', visible:false, opacity:.6, sz:1, mkrs:[], cnt:0, wms:null, info:'IF_0086 · 강도',          region:null, wmsId:'IF_0086', wmsStyle:'A2SM_CrmnlHspot_Tot_Brglr'},
   safemap_rape:      {id:'safemap_rape',      name:'성폭력',         color:'#be185d', icon:'⚠',  visible:false, opacity:.6, sz:1, mkrs:[], cnt:0, wms:null, info:'IF_0085 · 성폭력',        region:null, wmsId:'IF_0085', wmsStyle:'A2SM_CrmnlHspot_Tot_Rape'},
   // ── 밀양시 삼랑진읍 (데이터 미입력 — 추후 채움)
-  boundary_smj:{id:'boundary_smj',name:'삼랑진읍 경계',color:'#6366f1',icon:'🗂',visible:true,opacity:.5,sz:1,weight:2.5,leaf:null,mkrs:[],cnt:0, region:'miryang-smj'},
+  boundary_smj:{id:'boundary_smj',name:'삼랑진읍 경계',color:'#6366f1',icon:'🗂',visible:true,opacity:.25,sz:1,weight:3.0,leaf:null,mkrs:[],cnt:0, region:'miryang-smj'},
   vacant_smj:  {id:'vacant_smj',  name:'빈집',         color:'#f97316',icon:'🏚',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'miryang-smj'},
   light_smj:   {id:'light_smj',   name:'가로등',        color:'#f59e0b',icon:'💡',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'miryang-smj'},
   cctv_smj:    {id:'cctv_smj',    name:'CCTV',          color:'#3b82f6',icon:'📹',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'miryang-smj'},
@@ -794,10 +794,10 @@ function setLayerSz(id, v) {
 function saveLayers() {
   var s={};
   Object.keys(LAYERS).forEach(function(k){s[k]={visible:LAYERS[k].visible,opacity:LAYERS[k].opacity,sz:LAYERS[k].sz,weight:LAYERS[k].weight};});
-  lsSave('ly3', s);
+  lsSave('ly4', s);
 }
 function loadLayers() {
-  var s = lsLoad('ly3', null); if (!s) return;
+  var s = lsLoad('ly4', null); if (!s) return;
   Object.keys(s).forEach(function(k){if(LAYERS[k]){LAYERS[k].visible=s[k].visible;LAYERS[k].opacity=s[k].opacity;LAYERS[k].sz=s[k].sz||1;if(s[k].weight)LAYERS[k].weight=s[k].weight;}});
 }
 
@@ -1360,10 +1360,13 @@ function openPhotoMetaSheet(file, onNextCb) {
     pmDraft.dataUrl = e.target.result;
     var img = document.getElementById('pmImg');
     if (img) img.src = e.target.result;
-    // 파일명에서 제목 자동 제안
+    // 제목 자동 채움: YYYYMMDD_HHMMSS (편집 시 추적용으로 defaultTitle 저장)
     var titleEl = document.getElementById('pmTitle');
     if (titleEl && !titleEl.value) {
-      titleEl.value = file.name.replace(/\.[^.]+$/, '').replace(/[_\-]/g, ' ');
+      var _d = new Date(), _p = function(n){return String(n).padStart(2,'0');};
+      var defTitle = _d.getFullYear()+_p(_d.getMonth()+1)+_p(_d.getDate())+'_'+_p(_d.getHours())+_p(_d.getMinutes())+_p(_d.getSeconds());
+      titleEl.value = defTitle;
+      pmDraft.defaultTitle = defTitle;
     }
   };
   reader.readAsDataURL(file);
@@ -1452,8 +1455,19 @@ async function pmAutoGPS(file) {
     var ex = await exifr.parse(file, {gps:true, ifd0:true});
     if (ex && ex.latitude != null) {
       setGpsTxt('EXIF GPS', ex.latitude, ex.longitude);
-      if (ex.DateTimeOriginal || ex.DateTime)
-        pmDraft.exifDate = fmtDate(ex.DateTimeOriginal || ex.DateTime);
+      if (ex.DateTimeOriginal || ex.DateTime) {
+        var _exd = ex.DateTimeOriginal || ex.DateTime;
+        pmDraft.exifDate = fmtDate(_exd);
+        // 제목이 기본값과 동일하면 EXIF 시각으로 교체
+        var _ttl = document.getElementById('pmTitle');
+        var _d2 = new Date(_exd);
+        if (_ttl && pmDraft.defaultTitle && _ttl.value === pmDraft.defaultTitle && !isNaN(_d2.getTime())) {
+          var _p = function(n){return String(n).padStart(2,'0');};
+          var _new = _d2.getFullYear()+_p(_d2.getMonth()+1)+_p(_d2.getDate())+'_'+_p(_d2.getHours())+_p(_d2.getMinutes())+_p(_d2.getSeconds());
+          _ttl.value = _new;
+          pmDraft.defaultTitle = _new;
+        }
+      }
       return;
     }
   } catch(_) {}
@@ -2469,7 +2483,8 @@ async function exportAll(){
   pb(0.05);
 
   try{
-    var ts=new Date().toISOString().slice(0,10).replace(/-/g,'');
+    var _dt = new Date(), _pd = function(n){return String(n).padStart(2,'0');};
+    var ts = _dt.getFullYear()+_pd(_dt.getMonth()+1)+_pd(_dt.getDate())+'_'+_pd(_dt.getHours())+_pd(_dt.getMinutes())+_pd(_dt.getSeconds());
     var base='CPTED_'+ts;
     var shareFiles=[];
 
@@ -2509,8 +2524,7 @@ async function exportAll(){
 
     pb(0.9);
 
-    // ── navigator.share() — 모바일(iOS·Android)만 사용
-    // Windows 11 Chrome/Edge도 share를 지원하므로 기기 판별 필요
+    // ── 분기: iOS·Android = navigator.share / PC = ZIP 다운로드
     var shared=false;
     var isMobile = isIOS() || /Android/i.test(navigator.userAgent);
     if(isMobile && navigator.share && navigator.canShare && navigator.canShare({files:shareFiles})){
@@ -2518,12 +2532,12 @@ async function exportAll(){
         await navigator.share({files:shareFiles, title:'CPTED 현장기록 '+ts});
         shared=true;
       }catch(e){
-        if(e.name==='AbortError'){pb(0);return;} // 사용자 취소
+        if(e.name==='AbortError'){pb(0);return;}
         // 그 외 오류 → ZIP 폴백
       }
     }
 
-    // ── Android / PC: 다운로드
+    // ── PC: ZIP 다운로드
     if(!shared){
       function dlOne(blob, name){
         var a=document.createElement('a');
@@ -2531,9 +2545,6 @@ async function exportAll(){
         a.download=name; a.click();
         setTimeout(function(){URL.revokeObjectURL(a.href);},8000);
       }
-      function sleep(ms){ return new Promise(function(r){setTimeout(r,ms);}); }
-
-      // PC: ZIP 한 번에
       loadJSZip(async function(JSZip){
         var zip=new JSZip();
         shareFiles.forEach(function(f){
