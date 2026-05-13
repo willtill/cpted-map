@@ -167,9 +167,19 @@ html,body{width:100%;height:100%;overflow:hidden;
 .ic-v{font-size:13px;color:var(--m2);flex:1;line-height:1.5;}
 .ic-note{margin-top:10px;padding:10px 12px;background:var(--p2);border-radius:10px;
   font-size:13px;color:var(--m2);line-height:1.6;white-space:pre-wrap;}
+.ic-addr{margin-top:10px;padding:10px 12px;background:rgba(37,99,235,.08);
+  border-left:3px solid var(--accent);border-radius:8px;
+  font-size:13px;color:var(--text);line-height:1.55;}
+.ic-addr span{font-weight:600;}
 .ic-coords{margin-top:10px;padding:10px 12px;background:var(--p2);border-radius:10px;
+  cursor:pointer;user-select:none;transition:background .15s, transform .1s;
   font-family:monospace;font-size:11px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;}
+.ic-coords:hover{background:#e2e8f0;}
+.ic-coords:active{transform:scale(.98);}
 .ic-coords span{color:var(--accent);}
+.ic-coords::after{content:'📋';position:absolute;right:14px;top:50%;transform:translateY(-50%);
+  opacity:.35;font-size:14px;}
+.ic-coords{position:relative;}
 .ic-navi{margin-top:12px;width:100%;padding:14px;background:var(--accent);
   color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;}
 .ic-navi:active{opacity:.85;}
@@ -311,6 +321,11 @@ html,body{width:100%;height:100%;overflow:hidden;
   background:linear-gradient(to top,rgba(0,0,0,.8),transparent);
   padding:10px 12px 8px;display:flex;align-items:center;gap:6px;
   font-family:monospace;font-size:11px;color:rgba(255,255,255,.75);}
+.pm-addr{position:absolute;bottom:36px;left:12px;right:12px;
+  font-size:12px;font-weight:600;line-height:1.45;color:#fff;
+  background:rgba(0,0,0,.55);padding:6px 10px;border-radius:6px;
+  backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.3);}
+.pm-addr span{color:#bfdbfe;}
 .pm-gps-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;animation:gpspulse 2s infinite;}
 .pm-gps-dot.wait{background:var(--yellow);animation:gpspulse 1s infinite;}
 .pm-gps-dot.fail{background:var(--danger);animation:none;}
@@ -589,6 +604,65 @@ var ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services';
 var curKey = _bk ? 'vw-base' : 'esri-street';
 var hybridBase = null;
 var vwKey = _bk;
+
+// 좌표 → 한국 주소 (VWorld 우선, 실패 시 OSM Nominatim 폴백)
+var _addrCache = {};
+async function revGeocode(lat, lng) {
+  if (lat == null || lng == null) return null;
+  var key = lat.toFixed(5) + ',' + lng.toFixed(5);
+  if (_addrCache[key]) return _addrCache[key];
+
+  // 1차: VWorld
+  if (vwKey) {
+    try {
+      var url1 = 'https://api.vworld.kr/req/address?service=address&request=getAddress&version=2.0' +
+        '&crs=epsg:4326&point=' + lng + ',' + lat +
+        '&format=json&type=both&key=' + vwKey;
+      var resp = await fetch(url1);
+      if (resp.ok) {
+        var j = await resp.json();
+        if (j && j.response && j.response.status === 'OK' && j.response.result && j.response.result.length) {
+          var r = j.response.result.find(function(x){return x.type==='ROAD';}) || j.response.result[0];
+          if (r && r.text) {
+            var t = r.text.trim();
+            var s = r.structure || {};
+            if (s.detail && t.indexOf(s.detail) === -1) t = t + ' ' + s.detail;
+            _addrCache[key] = t; return t;
+          }
+        }
+      }
+    } catch(_) {}
+  }
+
+  // 2차: Nominatim
+  try {
+    var url2 = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1' +
+      '&lat=' + lat + '&lon=' + lng + '&accept-language=ko';
+    var r2 = await fetch(url2, {headers:{'Accept':'application/json'}});
+    if (r2.ok) {
+      var j2 = await r2.json();
+      var a = j2.address || {};
+      var parts = [];
+      if (a.province || a.state) parts.push(a.province || a.state);
+      if (a.city || a.county) parts.push(a.city || a.county);
+      var dist = a.city_district || a.borough;
+      if (dist && dist !== (a.city||a.county)) parts.push(dist);
+      var town = a.town || a.suburb || a.village || a.hamlet;
+      if (town) parts.push(town);
+      if (a.road) {
+        var rn = a.road;
+        if (a.house_number) rn += ' ' + a.house_number;
+        parts.push(rn);
+      }
+      if (parts.length >= 2) {
+        var nice = parts.join(' ');
+        _addrCache[key] = nice; return nice;
+      }
+    }
+  } catch(_) {}
+
+  return null;
+}
 var TILES = {
   'esri-street': L.tileLayer(ESRI+'/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {maxZoom:19}),
   'esri-sat':    L.tileLayer(ESRI+'/World_Imagery/MapServer/tile/{z}/{y}/{x}',    {maxZoom:19}),
@@ -1230,9 +1304,22 @@ function mkPhotoMkr(p) {
       '<img class="ic-img" src="'+(p.originalUrl||p.dataUrl)+'">'+
       '<div class="ic-name">'+safeTitle+xmpBadge+'</div>'+
       buildPhotoInfoRows(p)+
-      (p.lat?'<div class="ic-coords" style="margin-top:10px;"><div>위도 <span>'+p.lat.toFixed(6)+'</span></div><div>경도 <span>'+p.lng.toFixed(6)+'</span></div></div>':'')+
+      (p.lat?(
+        '<div class="ic-addr" id="ph-addr-'+p.id+'" style="'+(p.address?'':'display:none;')+'">📍 <span>'+(p.address||'')+'</span></div>'+
+        '<div class="ic-coords" title="클릭하면 좌표 복사" style="margin-top:10px;"><div>위도 <span>'+p.lat.toFixed(6)+'</span></div><div>경도 <span>'+p.lng.toFixed(6)+'</span></div></div>'
+      ):'')+
       (p.lat?naviBtn(p.lat,p.lng,p.name):'')
     );
+    // 주소가 비어있으면 비동기로 조회·저장·표시
+    if (p.lat && !p.address) {
+      revGeocode(p.lat, p.lng).then(function(addr){
+        if (!addr) return;
+        p.address = addr;
+        try { idbPut('photos', p); } catch(_) {}
+        var el = document.getElementById('ph-addr-'+p.id);
+        if (el) { el.querySelector('span').textContent = addr; el.style.display='block'; }
+      });
+    }
   });
   return m;
 }
@@ -1368,6 +1455,7 @@ function openPhotoMetaSheet(file, onNextCb) {
         '<div class="pm-gps-dot wait" id="pmGpsDot"></div>'+
         '<span id="pmGpsTxt">위치 확인 중...</span>'+
       '</div>'+
+      '<div class="pm-addr" id="pmAddrTxt" style="display:none;">📍 <span></span></div>'+
     '</div>'+
 
     // 제목
@@ -1509,6 +1597,19 @@ async function pmAutoGPS(file) {
     pmDraft.lat = lat; pmDraft.lng = lng; pmDraft.gpsSource = src;
     if (dotEl) { dotEl.classList.remove('wait','fail'); }
     if (txtEl) txtEl.textContent = src + '  ' + lat.toFixed(5) + ', ' + lng.toFixed(5);
+    // 비동기 주소 조회 — 결과 도착하면 화면 갱신
+    var addrBox = document.getElementById('pmAddrTxt');
+    if (addrBox) addrBox.style.display = 'none';
+    revGeocode(lat, lng).then(function(addr){
+      if (!addr) return;
+      pmDraft.address = addr;
+      var box = document.getElementById('pmAddrTxt');
+      if (box) {
+        var sp = box.querySelector('span');
+        if (sp) sp.textContent = addr;
+        box.style.display = 'block';
+      }
+    });
   }
   function setGpsFail() {
     if (dotEl) { dotEl.classList.remove('wait'); dotEl.classList.add('fail'); }
@@ -1709,6 +1810,7 @@ async function pmSave(onNextCb) {
       originalUrl: originalUrl, // 원본   → 다운로드·ZIP 내보내기
       lat: pmDraft.lat, lng: pmDraft.lng,
       gpsSource: pmDraft.gpsSource,
+      address: pmDraft.address || '',
       date: pmDraft.exifDate || today,
       hasXmp: false
     };
@@ -2496,10 +2598,10 @@ function buildSurveyTxt(sv){
   ].join('\n');
 }
 function buildPhotoCSV(arr){
-  var rows=['\uFEFF유형,ID,제목,조사일,위도,경도,위치출처,CPTED원칙,취약도,태그,설명'];
+  var rows=['\uFEFF유형,ID,제목,조사일,위도,경도,주소,위치출처,CPTED원칙,취약도,태그,설명'];
   arr.forEach(function(p){
     rows.push(['사진',p.id,p.name,p.date||'',p.lat||'',p.lng||'',
-      p.gpsSource||'',(p.cats||[]).join('|'),p.rating||0,
+      p.address||'',p.gpsSource||'',(p.cats||[]).join('|'),p.rating||0,
       (p.tags||[]).join('|'),p.desc||''].map(escCSV).join(','));
   });
   return rows.join('\n');
@@ -2817,6 +2919,36 @@ window.startNavi = startNavi;
     setTimeout(function(){ importFromFiles(files); }, 100);
   });
 })();
+
+// 좌표 블록 클릭 → 클립보드에 "lat, lng" 복사
+document.addEventListener('click', function(e) {
+  var el = e.target.closest('.ic-coords');
+  if (!el) return;
+  var spans = el.querySelectorAll('span');
+  if (spans.length < 2) return;
+  var lat = (spans[0].textContent||'').trim();
+  var lng = (spans[1].textContent||'').trim();
+  if (!lat || !lng) return;
+  var text = lat + ', ' + lng;
+  var done = function(){ toast('📋 좌표 복사됨  '+text); };
+  var fail = function(){ toast('복사 실패  '+text); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(function(){
+      // 일부 브라우저(특히 모바일에서 권한 거부)는 폴백
+      var ta = document.createElement('textarea'); ta.value=text;
+      ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); } catch(_) { fail(); }
+      document.body.removeChild(ta);
+    });
+  } else {
+    var ta = document.createElement('textarea'); ta.value=text;
+    ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch(_) { fail(); }
+    document.body.removeChild(ta);
+  }
+});
 
 // Event delegation for dynamically created navi buttons
 document.addEventListener('click', function(e) {
