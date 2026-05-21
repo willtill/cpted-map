@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0f172a">
 <title>CPTED MAP</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 :root{
@@ -488,7 +488,7 @@ html,body{width:100%;height:100%;overflow:hidden;
 </div>
 
 <!-- SCRIPTS AT END OF BODY -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
 <script>
@@ -3211,6 +3211,10 @@ document.addEventListener('click', function(e) {
   var startLocated = false;
   setTimeout(function(){
     map.invalidateSize(true);
+    // 벡터 렌더러(경계 폴리곤) 회전 호환: zoom-animated 클래스 보장 (Leaflet 버전 무관)
+    document.querySelectorAll('.leaflet-overlay-pane svg, .leaflet-overlay-pane canvas').forEach(function(el){
+      el.classList.add('leaflet-zoom-animated');
+    });
     if (!startLocated) {
       var lastR = REGIONS[REGIONS.length - 1];  // 가장 최근 사례지
       if (lastR && lastR.center) map.setView(lastR.center, lastR.zoom || 16);
