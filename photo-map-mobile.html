@@ -417,7 +417,7 @@ html,body{width:100%;height:100%;overflow:hidden;
 </div>
 
 <!-- 정북 고정 안내 배너 -->
-<div class="nlock-banner" id="nlockBanner">🧭 정북 고정 <span class="nlock-hint">탭 또는 N 길게 눌러 해제</span></div>
+<div class="nlock-banner" id="nlockBanner">🔓 정북 고정 해제 — 회전 가능 <span class="nlock-hint">탭 또는 N 길게 눌러 재고정</span></div>
 
 <!-- MAP CONTROLS -->
 <div class="mctrl">
@@ -824,19 +824,21 @@ function setNorthLock(on, silent) {
   var nb = document.getElementById('northBtn');
   var bn = document.getElementById('nlockBanner');
   if (on) {
+    // 잠금 = 평상시(기본) 상태 — 안내 문구 없이 조용히
     navMode = false;
     var rb = document.getElementById('rotBtn'); if (rb) rb.classList.remove('on');
     if (map.touchRotate && map.touchRotate.disable) map.touchRotate.disable(); // 두 손가락 회전 차단
     setBearing(0);                                                             // 정북으로 스냅
-    if (nb) nb.classList.add('locked');
-    if (bn) bn.classList.add('on');
-    if (!silent) toast('🧭 정북 고정 ON — 회전 잠금');
-    if (!silent && navigator.vibrate) { try { navigator.vibrate(30); } catch(_){} } // 햅틱 피드백
+    if (nb) nb.classList.remove('locked');   // 강조 해제
+    if (bn) bn.classList.remove('on');        // 배너 숨김
+    if (!silent && navigator.vibrate) { try { navigator.vibrate(30); } catch(_){} }
   } else {
-    if (map.touchRotate && map.touchRotate.enable) map.touchRotate.enable(); // 해제 시 두 손가락 회전 복구
-    if (nb) nb.classList.remove('locked');
-    if (bn) bn.classList.remove('on');
-    if (!silent) toast('🧭 정북 고정 OFF');
+    // 해제 = 회전 가능 — 이때만 안내 문구 표시
+    if (map.touchRotate && map.touchRotate.enable) map.touchRotate.enable(); // 두 손가락 회전 복구
+    if (nb) nb.classList.add('locked');       // N 버튼 강조(회전 모드 표시)
+    if (bn) bn.classList.add('on');           // "정북 고정 해제" 배너 표시
+    if (!silent) toast('🔓 정북 고정 해제 — 회전 가능');
+    if (!silent && navigator.vibrate) { try { navigator.vibrate(30); } catch(_){} }
   }
 }
 function toggleNorthLock() { setNorthLock(!northLock); }
@@ -864,7 +866,7 @@ function toggleNorthLock() { setNorthLock(!northLock); }
   n.addEventListener('contextmenu', function(e){ e.preventDefault(); }); // 길게 누를 때 메뉴 방지
   // 배너 탭으로도 해제
   var bn = document.getElementById('nlockBanner');
-  if (bn) bn.addEventListener('click', function(){ setNorthLock(false); });
+  if (bn) bn.addEventListener('click', function(){ setNorthLock(true); });
 })();
 
 // ══ LOCATION ══
@@ -3326,7 +3328,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'build 2026-05-21 · 19:10';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'build 2026-05-21 · 19:30';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   initBoundary(); initVacant(); initLights(); initCctv(); initSafemap();
   initVacantSMJ(); initLightsSMJ(); initCctvSMJ();
