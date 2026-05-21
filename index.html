@@ -424,8 +424,6 @@ html,body{width:100%;height:100%;overflow:hidden;
   <button class="mc mc-north" id="northBtn" title="탭: 정북 복귀 · 길게: 정북 고정"><svg id="northNeedle" width="26" height="26" viewBox="0 0 26 26"><text x="13" y="7" text-anchor="middle" font-size="7" font-weight="700" fill="#1e293b">N</text><polygon points="13,8 9,19 13,16 17,19" fill="#ef4444"/></svg></button>
   <button class="mc" id="locBtn">📍</button>
   <button class="mc" id="rotBtn" title="네비게이션 모드(방향따라 회전)">🧭</button>
-  <button class="mc" id="rotLBtn" title="왼쪽으로 15° 회전">↺</button>
-  <button class="mc" id="rotRBtn" title="오른쪽으로 15° 회전">↻</button>
   <button class="mc" id="ziBtn">＋</button>
   <button class="mc" id="zoBtn">－</button>
 </div>
@@ -795,19 +793,6 @@ document.getElementById('rotBtn').addEventListener('click', function() {
     setBearing(0);  // 정북 복귀
   }
 });
-// 수동 회전 버튼(±15°) — 두 손가락 회전 대신 명확한 회전 컨트롤
-(function(){
-  function step(delta){
-    if (northLock){ toast('정북 고정 중 — N을 길게 눌러 해제하세요'); return; }
-    navMode = false;
-    var rb = document.getElementById('rotBtn'); if (rb) rb.classList.remove('on');
-    var cur = (map.getBearing ? map.getBearing() : bearing);
-    setBearing(cur + delta);
-  }
-  var l = document.getElementById('rotLBtn'), r = document.getElementById('rotRBtn');
-  if (l) l.addEventListener('click', function(){ step(-15); });
-  if (r) r.addEventListener('click', function(){ step(15); });
-})();
 // 방위표 클릭 → 정북 복귀 + 네비 모드 해제
 function resetNorth() {
   navMode = false;
@@ -3328,7 +3313,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'build 2026-05-21 · 19:30';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'build 2026-05-21 · 19:45';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   initBoundary(); initVacant(); initLights(); initCctv(); initSafemap();
   initVacantSMJ(); initLightsSMJ(); initCctvSMJ();
