@@ -89,6 +89,14 @@ html,body{width:100%;height:100%;overflow:hidden;
   box-shadow:0 2px 10px rgba(0,0,0,.35);}
 .mc-north:active{opacity:1;transform:scale(.92);}
 #northNeedle{transition:transform .12s linear;transform-origin:50% 50%;}
+.mc-north.locked{background:#6366f1;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.35);}
+.mc-north.locked #northNeedle text{fill:#fff;}
+.nlock-banner{position:fixed;top:calc(var(--safe-t) + 50px);left:50%;transform:translateX(-50%) translateY(-8px);
+  z-index:150;display:none;align-items:center;gap:7px;background:rgba(99,102,241,.96);color:#fff;
+  font-size:13px;font-weight:700;padding:8px 16px;border-radius:22px;box-shadow:0 4px 14px rgba(99,102,241,.4);
+  letter-spacing:-.2px;white-space:nowrap;cursor:pointer;opacity:0;transition:opacity .2s,transform .2s;}
+.nlock-banner.on{display:flex;opacity:1;transform:translateX(-50%) translateY(0);}
+.nlock-hint{font-size:11px;font-weight:500;opacity:.85;}
 /* 줌 +/- 흰색 글자 */
 #ziBtn, #zoBtn{color:#fff;font-weight:700;}
 
@@ -387,6 +395,10 @@ html,body{width:100%;height:100%;overflow:hidden;
 .pm-dl:active{opacity:.7;}
 .pm-dl.ready{border-color:var(--green);color:var(--green);}
 .pm-area{resize:none;height:88px;line-height:1.6;}
+.build-tag{position:fixed;left:8px;bottom:calc(var(--nav) + var(--safe-b) + 6px);z-index:95;
+  font-size:9px;line-height:1;color:rgba(255,255,255,.6);background:rgba(15,23,42,.45);
+  padding:3px 7px;border-radius:8px;pointer-events:none;letter-spacing:.2px;
+  backdrop-filter:blur(3px);font-variant-numeric:tabular-nums;}
 </style>
 </head>
 <body>
@@ -394,6 +406,7 @@ html,body{width:100%;height:100%;overflow:hidden;
 <div id="map"></div>
 
 <!-- TOP BAR -->
+<div class="build-tag" id="buildTag">build —</div>
 <div class="top">
   <div class="top-logo">CPTED MAP</div>
   <div class="chip" style="color:#10b981;border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.08)">📷<b id="pcnt">0</b></div>
@@ -403,13 +416,16 @@ html,body{width:100%;height:100%;overflow:hidden;
   
 </div>
 
-<!-- COMPASS -->
+<!-- 정북 고정 안내 배너 -->
+<div class="nlock-banner" id="nlockBanner">🧭 정북 고정 <span class="nlock-hint">탭 또는 N 길게 눌러 해제</span></div>
 
 <!-- MAP CONTROLS -->
 <div class="mctrl">
-  <button class="mc mc-north" id="northBtn" title="방위 표시 · 탭하면 정북 복귀"><svg id="northNeedle" width="26" height="26" viewBox="0 0 26 26"><text x="13" y="7" text-anchor="middle" font-size="7" font-weight="700" fill="#1e293b">N</text><polygon points="13,8 9,19 13,16 17,19" fill="#ef4444"/></svg></button>
+  <button class="mc mc-north" id="northBtn" title="탭: 정북 복귀 · 길게: 정북 고정"><svg id="northNeedle" width="26" height="26" viewBox="0 0 26 26"><text x="13" y="7" text-anchor="middle" font-size="7" font-weight="700" fill="#1e293b">N</text><polygon points="13,8 9,19 13,16 17,19" fill="#ef4444"/></svg></button>
   <button class="mc" id="locBtn">📍</button>
   <button class="mc" id="rotBtn" title="네비게이션 모드(방향따라 회전)">🧭</button>
+  <button class="mc" id="rotLBtn" title="왼쪽으로 15° 회전">↺</button>
+  <button class="mc" id="rotRBtn" title="오른쪽으로 15° 회전">↻</button>
   <button class="mc" id="ziBtn">＋</button>
   <button class="mc" id="zoBtn">－</button>
 </div>
@@ -611,10 +627,14 @@ function idbClear(store) {
 var map = L.map('map', {
   center: [35.9975, 129.415],
   zoom: 16,
+  zoomSnap: 0.25,           // 분수 줌 허용(0.25 단위) — 미세 조정
+  zoomDelta: 0.5,           // +/- 버튼·더블탭 한 번에 0.5단계
+  wheelPxPerZoomLevel: 120, // 휠/트랙패드 줌을 더 완만하게 (기본 60)
+  zoomAnimation: false,     // 줌 애니메이션 끔 → 타일·경계가 함께 즉시 이동(특히 PC 어긋남 방지)
   zoomControl: false,
   attributionControl: false,
   rotate: true,          // leaflet-rotate: 회전 지원
-  touchRotate: true,     // 두 손가락 회전 제스처 (pan·줌과 함께 올바르게 작동)
+  touchRotate: true,     // 두 손가락 줌+회전 동시 (이전 동작으로 복귀)
   rotateControl: false,  // 커스텀 방위표 사용
   bearing: 0
 });
@@ -637,6 +657,10 @@ if (map.on) {
     if (deviceHeading != null) updateLocCone(deviceHeading);
   });
 }
+
+// (두 손가락 회전을 껐으므로 제스처 잠금 불필요 — 제거됨)
+
+
 
 var ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services';
 var curKey = _bk ? 'vw-base' : 'esri-street';
@@ -733,8 +757,8 @@ function setTile(k) {
 }
 
 // Zoom buttons
-document.getElementById('ziBtn').addEventListener('click', function(){ map.zoomIn(); });
-document.getElementById('zoBtn').addEventListener('click', function(){ map.zoomOut(); });
+document.getElementById('ziBtn').addEventListener('click', function(){ map.zoomIn(0.5); });
+document.getElementById('zoBtn').addEventListener('click', function(){ map.zoomOut(0.5); });
 
 // ══ ROTATION ══
 var bearing = 0, navMode = false;
@@ -759,32 +783,88 @@ function updateCompassRose() {
 
 // 네비게이션 모드: 기기 방향에 따라 지도 자동 회전
 document.getElementById('rotBtn').addEventListener('click', function() {
+  if (northLock){ toast('정북 고정 중 — N을 길게 눌러 해제하세요'); return; }
   navMode = !navMode;
   this.classList.toggle('on', navMode);
   if (navMode) {
     startCompass();  // 나침반 활성화 (iOS 권한 포함)
-    if (map.touchRotate && map.touchRotate.disable) map.touchRotate.disable(); // 자동 회전 중 수동 회전 비활성
     toast('🧭 네비게이션 모드 ON — 보는 방향으로 지도 회전');
     if (deviceHeading != null) setBearing(-deviceHeading);
   } else {
-    if (map.touchRotate && map.touchRotate.enable) map.touchRotate.enable();
     toast('🧭 네비게이션 모드 OFF');
     setBearing(0);  // 정북 복귀
   }
 });
+// 수동 회전 버튼(±15°) — 두 손가락 회전 대신 명확한 회전 컨트롤
+(function(){
+  function step(delta){
+    if (northLock){ toast('정북 고정 중 — N을 길게 눌러 해제하세요'); return; }
+    navMode = false;
+    var rb = document.getElementById('rotBtn'); if (rb) rb.classList.remove('on');
+    var cur = (map.getBearing ? map.getBearing() : bearing);
+    setBearing(cur + delta);
+  }
+  var l = document.getElementById('rotLBtn'), r = document.getElementById('rotRBtn');
+  if (l) l.addEventListener('click', function(){ step(-15); });
+  if (r) r.addEventListener('click', function(){ step(15); });
+})();
 // 방위표 클릭 → 정북 복귀 + 네비 모드 해제
 function resetNorth() {
   navMode = false;
   var rb = document.getElementById('rotBtn');
   if (rb) rb.classList.remove('on');
-  if (map.touchRotate && map.touchRotate.enable) map.touchRotate.enable();
   setBearing(0);
-  toast('🧭 정북 정렬');
+  toast(northLock ? '🧭 정북 고정 중' : '🧭 정북 정렬');
 }
-// 정북 복귀 버튼 (우측 최상단)
+
+// ── 정북 고정(North-Lock) — 의도치 않은 회전 차단, 방위 일관성 유지 ──
+var northLock = false;
+function setNorthLock(on, silent) {
+  northLock = on;
+  var nb = document.getElementById('northBtn');
+  var bn = document.getElementById('nlockBanner');
+  if (on) {
+    navMode = false;
+    var rb = document.getElementById('rotBtn'); if (rb) rb.classList.remove('on');
+    if (map.touchRotate && map.touchRotate.disable) map.touchRotate.disable(); // 두 손가락 회전 차단
+    setBearing(0);                                                             // 정북으로 스냅
+    if (nb) nb.classList.add('locked');
+    if (bn) bn.classList.add('on');
+    if (!silent) toast('🧭 정북 고정 ON — 회전 잠금');
+    if (!silent && navigator.vibrate) { try { navigator.vibrate(30); } catch(_){} } // 햅틱 피드백
+  } else {
+    if (map.touchRotate && map.touchRotate.enable) map.touchRotate.enable(); // 해제 시 두 손가락 회전 복구
+    if (nb) nb.classList.remove('locked');
+    if (bn) bn.classList.remove('on');
+    if (!silent) toast('🧭 정북 고정 OFF');
+  }
+}
+function toggleNorthLock() { setNorthLock(!northLock); }
+
+// N 버튼: 짧은 탭=정북 복귀 / 길게 홀드(0.6초)=정북 고정 토글
 (function(){
   var n = document.getElementById('northBtn');
-  if (n) n.addEventListener('click', resetNorth);
+  if (!n) return;
+  var holdTimer = null, held = false;
+  function start(){
+    held = false;
+    if (holdTimer) clearTimeout(holdTimer);
+    holdTimer = setTimeout(function(){ held = true; toggleNorthLock(); }, 600);
+  }
+  function end(){
+    if (holdTimer){ clearTimeout(holdTimer); holdTimer = null; }
+    if (!held) resetNorth();   // 짧은 탭
+    held = false;
+  }
+  function cancel(){ if (holdTimer){ clearTimeout(holdTimer); holdTimer = null; } held = false; }
+  n.addEventListener('pointerdown', start);
+  n.addEventListener('pointerup', end);
+  n.addEventListener('pointercancel', cancel);
+  n.addEventListener('pointerleave', cancel);
+  n.addEventListener('contextmenu', function(e){ e.preventDefault(); }); // 길게 누를 때 메뉴 방지
+  // 배너 탭으로도 해제
+  var bn = document.getElementById('nlockBanner');
+  if (bn) bn.addEventListener('click', function(){ setNorthLock(false); });
 })();
 
 // ══ LOCATION ══
@@ -846,7 +926,7 @@ function startCompass() {
     h = ((h % 360) + 360) % 360;
     var sh = smoothHeading(h);
     deviceHeading = sh;
-    if (navMode) {
+    if (navMode && !northLock) {
       var now = Date.now();
       // 변화량 5° 이상 + 250ms 간격일 때만 회전 (떨림 방지)
       var diff = Math.abs(((sh - _lastApplied + 540) % 360) - 180);
@@ -1050,7 +1130,7 @@ var L_BASE  = {vacant:20, light:20, cctv:20, photo:42, survey:32, boundary:0};
 
 function applyVis(id) {
   var ly = LAYERS[id];
-  if ((id==='boundary'||id==='boundary_smj') && ly.leaf) { ly.visible ? map.addLayer(ly.leaf) : map.removeLayer(ly.leaf); return; }
+  if (id==='boundary'||id==='boundary_smj'||id==='boundary_sj') { drawBoundaries(); return; }
   if (ly.wmsId && ly.wms) { ly.visible ? map.addLayer(ly.wms) : map.removeLayer(ly.wms); return; }
   ly.mkrs.forEach(function(m){ ly.visible ? map.addLayer(m) : map.removeLayer(m); });
 }
@@ -1063,16 +1143,16 @@ function addMkr(id, m) {
 }
 function setLayerOp(id, v) {
   LAYERS[id].opacity = v;
-  if ((id==='boundary'||id==='boundary_smj') && LAYERS[id].leaf) { LAYERS[id].leaf.setStyle({fillOpacity:v, opacity:.95}); saveLayers(); return; }
+  if (id==='boundary'||id==='boundary_smj'||id==='boundary_sj') { drawBoundaries(); saveLayers(); return; }
   if (LAYERS[id].wmsId && LAYERS[id].wms) { LAYERS[id].wms.setOpacity(v); saveLayers(); return; }
   LAYERS[id].mkrs.forEach(function(m){ var e=m.getElement(); if(e) e.style.opacity=v; });
   saveLayers();
 }
 function setLayerSz(id, v) {
   // 경계선: sz 슬라이더는 선 두께를 의미
-  if (id==='boundary' || id==='boundary_smj') {
+  if (id==='boundary' || id==='boundary_smj' || id==='boundary_sj') {
     LAYERS[id].weight = v;
-    if (LAYERS[id].leaf) LAYERS[id].leaf.setStyle({weight: v});
+    drawBoundaries();
     saveLayers(); return;
   }
   LAYERS[id].sz = v;
@@ -1256,24 +1336,79 @@ document.getElementById('gallInput').addEventListener('change', function(e){
 });
 
 // ══ INIT LAYERS ══
-// 회전 시 벡터가 잘리지 않도록 큰 패딩의 공용 SVG 렌더러
-var rotRenderer = L.svg({ padding: 3 });
+// ── 경계 커스텀 오버레이 (회전 중에도 정확) ──
+// 마커와 동일한 회전 좌표계로 직접 그려, 플러그인의 벡터 회전 버그를 우회
+function bndRings(){
+  // 청림동(geoJSON): coordinates [[[lng,lat],...]] → [[lat,lng],...]
+  try {
+    var coords = BOUNDARY.features[0].geometry.coordinates;
+    LAYERS.boundary.rings = coords.map(function(ring){
+      return ring.map(function(c){ return [c[1], c[0]]; });
+    });
+  } catch(_) { LAYERS.boundary.rings = []; }
+  LAYERS.boundary_smj.rings = (typeof BOUNDARY_SMJ!=='undefined' && BOUNDARY_SMJ.length) ? [BOUNDARY_SMJ] : [];
+  LAYERS.boundary_sj.rings  = (typeof BOUNDARY_SJ!=='undefined'  && BOUNDARY_SJ.length)  ? [BOUNDARY_SJ]  : [];
+  LAYERS.boundary.cnt = LAYERS.boundary.rings.length ? 1 : 0;
+  LAYERS.boundary_smj.cnt = LAYERS.boundary_smj.rings.length ? 1 : 0;
+  LAYERS.boundary_sj.cnt = LAYERS.boundary_sj.rings.length ? 1 : 0;
+}
+var bndSvg = null, bndPaneEl = null, _bndRaf = null, _bndPaths = {};
 function initBoundary(){
-  // 선 투명도 95% 고정 / 두께·채움 투명도는 슬라이더로 조절
-  var makeStyle = function(ly){ return {
-    color:'#6366f1', weight: ly.weight, opacity:.95,
-    fillColor:'#6366f1', fillOpacity: ly.opacity, dashArray:'6 4',
-    renderer: rotRenderer
-  };};
-  LAYERS.boundary.leaf = L.geoJSON(BOUNDARY, {style: makeStyle(LAYERS.boundary), renderer: rotRenderer}).addTo(map);
-  if (typeof BOUNDARY_SMJ !== 'undefined' && BOUNDARY_SMJ.length) {
-    LAYERS.boundary_smj.leaf = L.polygon(BOUNDARY_SMJ, makeStyle(LAYERS.boundary_smj)).addTo(map);
-    LAYERS.boundary_smj.cnt = 1;
+  bndRings();
+  // 타일(아래)과 마커(위) 사이 전용 pane 생성
+  if (!map.getPane('bndPane')) {
+    map.createPane('bndPane');
+    bndPaneEl = map.getPane('bndPane');
+    bndPaneEl.style.zIndex = 250;
+    bndPaneEl.style.pointerEvents = 'none';
+    // 경계가 타일 위·마커 아래에 오도록 회전/논회전 pane z-index 명시
+    if (map.getPane('rotatePane'))   map.getPane('rotatePane').style.zIndex = 200;
+    if (map.getPane('norotatePane')) map.getPane('norotatePane').style.zIndex = 300;
+  } else {
+    bndPaneEl = map.getPane('bndPane');
   }
-  if (typeof BOUNDARY_SJ !== 'undefined' && BOUNDARY_SJ.length) {
-    LAYERS.boundary_sj.leaf = L.polygon(BOUNDARY_SJ, makeStyle(LAYERS.boundary_sj)).addTo(map);
-    LAYERS.boundary_sj.cnt = 1;
-  }
+  var NS = 'http://www.w3.org/2000/svg';
+  bndSvg = document.createElementNS(NS, 'svg');
+  bndSvg.style.cssText = 'position:absolute;top:0;left:0;overflow:visible;';
+  bndPaneEl.appendChild(bndSvg);
+  // 경로 요소를 미리 만들어 재사용 (매번 DOM 재생성하지 않음 → 빠름)
+  ['boundary','boundary_smj','boundary_sj'].forEach(function(id){
+    var p = document.createElementNS(NS,'path');
+    p.setAttribute('stroke-dasharray','6 4');
+    p.setAttribute('stroke-linejoin','round');
+    bndSvg.appendChild(p);
+    _bndPaths[id] = p;
+  });
+  // 줌(핀치 중 포함)·회전·뷰 변경 시 좌표 재계산. pan은 mapPane가 함께 옮기므로 제외.
+  map.on('zoom zoomend rotate viewreset resize moveend', requestBndDraw);
+  requestBndDraw();
+}
+function requestBndDraw(){
+  if (_bndRaf) return;
+  _bndRaf = requestAnimationFrame(function(){ _bndRaf = null; drawBoundaries(); });
+}
+function drawBoundaries(){
+  if (!bndSvg) return;
+  ['boundary','boundary_smj','boundary_sj'].forEach(function(id){
+    var ly = LAYERS[id], path = _bndPaths[id];
+    if (!path) return;
+    if (!ly || !ly.visible || !ly.rings || !ly.rings.length) { path.setAttribute('d',''); return; }
+    var d = '';
+    ly.rings.forEach(function(ring){
+      for (var i=0; i<ring.length; i++){
+        var lp = map.latLngToLayerPoint(ring[i]);
+        var p = map._rotate ? map.rotatedPointToMapPanePoint(lp) : lp;  // 마커와 동일한 좌표계
+        d += (i===0?'M':'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1) + ' ';
+      }
+      d += 'Z ';
+    });
+    path.setAttribute('d', d);            // 좌표만 갱신 — DOM 재생성 없음
+    path.setAttribute('fill', ly.color);
+    path.setAttribute('fill-opacity', ly.opacity);
+    path.setAttribute('stroke', ly.color);
+    path.setAttribute('stroke-width', ly.weight);
+    path.setAttribute('stroke-opacity', '0.95');
+  });
 }
 function initVacant(){
   VACANT.forEach(function(h){
@@ -3191,6 +3326,8 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'build 2026-05-21 · 19:10';
+  setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   initBoundary(); initVacant(); initLights(); initCctv(); initSafemap();
   initVacantSMJ(); initLightsSMJ(); initCctvSMJ();
   initVacantSJ(); initCctvSJ(); initBellSJ();
