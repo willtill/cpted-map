@@ -7,7 +7,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0f172a">
 <title>CPTED MAP</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"/>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://api.vworld.kr" crossorigin>
+<link rel="preconnect" href="https://server.arcgisonline.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 :root{
@@ -502,9 +505,8 @@ html,body{width:100%;height:100%;overflow:hidden;
 </div>
 
 <!-- SCRIPTS AT END OF BODY -->
-<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
 <script>
 // ── VWorld 키 사전 초기화 ──
 var _bk=(function(){var s=90,b=atob('ax5sZG4dWW92ZRgcaU1pYhlucx4iHGJxHmYbUWodZR9oGllo'),r='';for(var i=0;i<b.length;i++)r+=String.fromCharCode(b.charCodeAt(i)^(s+i%7));return r;})();
@@ -623,7 +625,7 @@ function idbClear(store) {
 
 // ══ MAP INIT ══
 var map = L.map('map', {
-  center: [35.9975, 129.415],
+  center: [35.91626, 128.28699],  // 최근 사례지(성주읍)로 바로 시작 → 점프·타일 재로딩 방지
   zoom: 16,
   zoomSnap: 0.25,           // 분수 줌 허용(0.25 단위) — 미세 조정
   zoomDelta: 0.5,           // +/- 버튼·더블탭 한 번에 0.5단계
@@ -1675,7 +1677,7 @@ async function processPhotos(files) {
     pb((i+1)/arr.length);
     var url = await toDataURL(arr[i]);
     var lat=null,lng=null,dt=null;
-    try { var ex=await exifr.parse(arr[i],{gps:true,ifd0:true}); if(ex&&ex.latitude!=null){lat=ex.latitude;lng=ex.longitude;} if(ex)dt=fmtDate(ex.DateTimeOriginal||ex.DateTime); } catch(_){}
+    try { var ex=await (await ensureExifr()).parse(arr[i],{gps:true,ifd0:true}); if(ex&&ex.latitude!=null){lat=ex.latitude;lng=ex.longitude;} if(ex)dt=fmtDate(ex.DateTimeOriginal||ex.DateTime); } catch(_){}
     if (!lat && lastPos) { lat=lastPos.lat; lng=lastPos.lng; toast('📍 EXIF GPS 없음 — 현재 위치 사용'); }
     if (!lat) {
       var gpsResult = await new Promise(function(res) {
@@ -1962,7 +1964,7 @@ async function pmAutoGPS(file) {
 
   // 1) EXIF GPS 시도
   try {
-    var ex = await exifr.parse(file, {gps:true, ifd0:true});
+    var ex = await (await ensureExifr()).parse(file, {gps:true, ifd0:true});
     if (ex && ex.latitude != null) {
       setGpsTxt('EXIF GPS', ex.latitude, ex.longitude);
       if (ex.DateTimeOriginal || ex.DateTime) {
@@ -2986,6 +2988,20 @@ async function shareOrDownload(blob, filename, shareTitle) {
   setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
 }
 
+// exifr 지연 로딩 — 사진 EXIF 추출 시에만 다운로드 (시작 로딩 가속)
+var _exifrP = null;
+function ensureExifr(){
+  if (window.exifr) return Promise.resolve(window.exifr);
+  if (_exifrP) return _exifrP;
+  _exifrP = new Promise(function(res, rej){
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js';
+    s.onload = function(){ res(window.exifr); };
+    s.onerror = function(){ _exifrP = null; rej(new Error('exifr load failed')); };
+    document.head.appendChild(s);
+  });
+  return _exifrP;
+}
 function loadJSZip(cb){
   if(window.JSZip){cb(window.JSZip);return;}
   var s=document.createElement('script');
@@ -3160,7 +3176,7 @@ async function importFromFiles(files){
 
         // 2순위: exifr (GPS 등 EXIF 추출용)
         var ex={};
-        try{ ex=await exifr.parse(f,{gps:true,ifd0:true})||{}; }
+        try{ ex=await (await ensureExifr()).parse(f,{gps:true,ifd0:true})||{}; }
         catch(xe){ console.warn('[import] exifr 실패:',f.name,xe); }
 
         // 제목: XMP 직접 추출 → 파일명 폴백
@@ -3313,20 +3329,22 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'build 2026-05-21 · 19:45';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'build 2026-05-21 · 20:30';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
-  initBoundary(); initVacant(); initLights(); initCctv(); initSafemap();
-  initVacantSMJ(); initLightsSMJ(); initCctvSMJ();
-  initVacantSJ(); initCctvSJ(); initBellSJ();
+  // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
+  requestAnimationFrame(function(){
+    initBoundary(); initVacant(); initLights(); initCctv(); initSafemap();
+    initVacantSMJ(); initLightsSMJ(); initCctvSMJ();
+    initVacantSJ(); initCctvSJ(); initBellSJ();
+    Object.keys(LAYERS).forEach(function(id){ applyVis(id); });
+    updCounts();
+  });
 
   // Restore tile
   var st=lsLoad('tile','esri-street');
   // Only switch tile if key is available for vworld
   if(st.startsWith('vw-') && !vwKey) st='esri-street';
   if(st !== 'esri-street') setTile(st);
-
-  // Apply layer visibility
-  Object.keys(LAYERS).forEach(function(id){ applyVis(id); });
 
   // Restore photos
   var savedP = await idbAll('photos');
@@ -3351,7 +3369,7 @@ document.addEventListener('click', function(e) {
       if (lastR && lastR.center) map.setView(lastR.center, lastR.zoom || 16);
     }
     if(vwKey && st==='esri-street') setTile('vw-base');
-  }, 200);
+  }, 60);
 
   if(savedP.length+savedS.length>0)
     toast('💾 사진 '+savedP.length+'개, 조사 '+savedS.length+'건 복원');
