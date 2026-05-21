@@ -305,9 +305,24 @@ html,body{width:100%;height:100%;overflow:hidden;
   justify-content:center;font-size:20px;cursor:pointer;}
 .compass.on{display:flex;}
 
-/* ── LOC MARKER ── */
-.loc-dot{width:18px;height:18px;border-radius:50%;
-  background:rgba(59,130,246,.25);border:2px solid var(--accent);}
+/* ── LOC MARKER (구글맵 스타일 방향 콘) ── */
+.loc-marker{position:relative;width:26px;height:26px;}
+.loc-cone{position:absolute;left:50%;top:50%;width:0;height:0;
+  border-left:16px solid transparent;border-right:16px solid transparent;
+  border-bottom:36px solid rgba(37,99,235,.55);
+  transform-origin:50% 100%;
+  transform:translate(-50%,-100%) rotate(0deg);
+  transition:transform .1s linear;
+  pointer-events:none;display:none;
+  filter:drop-shadow(0 0 4px rgba(37,99,235,.5));}
+.loc-dot{position:absolute;left:50%;top:50%;
+  width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;
+  background:#2563eb;border:3px solid #fff;
+  box-shadow:0 0 0 1.5px rgba(0,0,0,.3),0 1px 7px rgba(0,0,0,.55);
+  z-index:2;}
+.loc-dot::after{content:'';position:absolute;inset:-9px;border-radius:50%;
+  border:2px solid rgba(37,99,235,.45);animation:locpulse 2s ease-out infinite;}
+@keyframes locpulse{0%{transform:scale(.6);opacity:.8;}100%{transform:scale(1.6);opacity:0;}}
 
 /* Leaflet override */
 .leaflet-control-zoom{display:none;}
@@ -729,57 +744,176 @@ function setLoc(lat, lng, acc) {
   lastPos = {lat: lat, lng: lng};
   if (!locM) {
     locM = L.marker([lat,lng], {
-      icon: L.divIcon({html:'<div class="loc-dot"></div>', className:'', iconSize:[18,18], iconAnchor:[9,9]}),
+      icon: L.divIcon({
+        html:'<div class="loc-marker"><div class="loc-cone" id="locCone"></div><div class="loc-dot"></div></div>',
+        className:'', iconSize:[26,26], iconAnchor:[13,13]
+      }),
       zIndexOffset: 1000
     }).addTo(map);
-    locC = L.circle([lat,lng], {radius:acc||30, color:'#3b82f6', fillColor:'#3b82f6', fillOpacity:.08, weight:1}).addTo(map);
+    locC = L.circle([lat,lng], {radius:acc||30, color:'#2563eb', fillColor:'#2563eb', fillOpacity:.1, weight:1.5}).addTo(map);
   } else {
     locM.setLatLng([lat,lng]);
     if (locC) locC.setLatLng([lat,lng]).setRadius(acc||30);
   }
+  // 마커 재생성 후 방향 콘 복원
+  if (deviceHeading != null) updateLocCone(deviceHeading);
+}
+
+// ── 기기 나침반 방향 (구글맵 방향 콘) ──
+var deviceHeading = null, compassStarted = false;
+function updateLocCone(h) {
+  var cone = document.getElementById('locCone');
+  if (cone) {
+    cone.style.display = 'block';
+    // 지도 회전(rotLock) 보정: 콘은 항상 절대 방위를 가리킴
+    cone.style.transform = 'translate(-50%,-100%) rotate(' + (h - bearing) + 'deg)';
+  }
+}
+function startCompass() {
+  if (compassStarted) return;
+  function onOrient(e) {
+    var h = null;
+    if (e.webkitCompassHeading != null) h = e.webkitCompassHeading;     // iOS: 정북 기준 시계방향
+    else if (e.alpha != null) h = 360 - e.alpha;                         // Android: alpha 보정
+    if (h != null && !isNaN(h)) {
+      deviceHeading = ((h % 360) + 360) % 360;
+      updateLocCone(deviceHeading);
+    }
+  }
+  // iOS 13+ : 권한 요청 (사용자 제스처 필요 — locBtn 클릭에서 호출됨)
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission().then(function(resp){
+      if (resp === 'granted') {
+        window.addEventListener('deviceorientation', onOrient, true);
+        compassStarted = true;
+        toast('🧭 방향 표시 활성화');
+      } else {
+        toast('나침반 권한 거부됨');
+      }
+    }).catch(function(){});
+  } else {
+    // Android·기타: 권한 불필요
+    window.addEventListener('deviceorientationabsolute', onOrient, true);
+    window.addEventListener('deviceorientation', onOrient, true);
+    compassStarted = true;
+  }
 }
 var locRequesting = false;
-document.getElementById('locBtn').addEventListener('click', function() {
-  if (!navigator.geolocation) { toast('❌ GPS를 지원하지 않는 기기'); return; }
-  var btn = this;
+
+// 위치 권한 거부 시 기기별 해결 안내
+function showLocationHelp(reason) {
+  var isSamsung = /SamsungBrowser/i.test(navigator.userAgent);
+  var isAndroid = /Android/i.test(navigator.userAgent);
+  var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  var isInsecure = !window.isSecureContext;
+
+  var steps = '';
+  if (isInsecure) {
+    steps = '<b style="color:var(--danger);font-size:14px;">⚠ HTTPS 주소가 아닙니다</b><br><br>'+
+      'GPS·위치 기능은 보안 연결(HTTPS)에서만 작동합니다. 다운로드한 HTML 파일을 직접 열거나(file://) http로 접속하면 <b>위치가 영구 차단</b>됩니다.<br><br>'+
+      '<b style="color:var(--accent);">해결: 아래 주소로 접속하세요</b><br>'+
+      '<span style="font-family:monospace;font-size:13px;background:var(--p2);padding:4px 8px;border-radius:6px;display:inline-block;margin-top:4px;">https://willtill.github.io/cpted-map</span><br><br>'+
+      '<span style="color:var(--muted);font-size:11px;">현재 주소: '+location.href.slice(0,60)+'</span>';
+  } else if (isSamsung) {
+    steps =
+      '<b>삼성 인터넷 브라우저:</b><br>'+
+      '1. 주소창 왼쪽 <b>자물쇠/메뉴 아이콘</b> 탭<br>'+
+      '2. <b>권한</b> 또는 <b>사이트 권한</b><br>'+
+      '3. <b>위치</b> → <b>허용</b><br>'+
+      '4. 페이지 새로고침 후 📍 다시 누르기<br><br>'+
+      '<span style="color:var(--muted);">그래도 안 되면: 설정 → 사이트 및 다운로드 → 사이트 권한 → 위치 → 차단 목록에서 이 사이트 제거</span><br><br>'+
+      '<b>휴대폰 시스템 위치도 확인:</b><br>설정 → 위치 → 켜기, 그리고 삼성 인터넷 앱에 위치 권한 허용';
+  } else if (isAndroid) {
+    steps =
+      '<b>Chrome (안드로이드):</b><br>'+
+      '1. 주소창 왼쪽 <b>🔒 자물쇠</b> 탭<br>'+
+      '2. <b>권한</b> → <b>위치</b> → <b>허용</b><br>'+
+      '3. 새로고침 후 📍 다시 누르기<br><br>'+
+      '<b>시스템 위치 확인:</b><br>설정 → 위치 → 켜기, 브라우저 앱에 위치 권한 허용';
+  } else if (isIOS) {
+    steps =
+      '<b>Safari (iOS):</b><br>'+
+      '1. 설정 → Safari → 위치 → <b>허용</b><br>'+
+      '2. 설정 → 개인정보 보호 → 위치 서비스 → <b>켜기</b><br>'+
+      '3. Safari에 위치 접근 허용';
+  } else {
+    steps = '브라우저 주소창의 자물쇠 아이콘 → 위치 권한 → 허용으로 변경 후 새로고침하세요.';
+  }
+
+  openSheet('📍 위치 권한 필요', '');
+  var body = document.getElementById('shBody');
+  if (body) {
+    body.innerHTML =
+      '<div style="padding:16px;">'+
+        '<div style="padding:14px;background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.2);border-radius:10px;font-size:13px;line-height:1.7;color:var(--text);">'+
+          steps+
+        '</div>'+
+        '<div style="margin-top:14px;font-size:12px;color:var(--muted);line-height:1.6;">'+
+          '💡 현재 위치를 못 잡아도 지도 검색·사진 GPS·현장조사 기능은 정상 사용 가능합니다.'+
+        '</div>'+
+      '</div>';
+  }
+}
+
+function requestLocation(btn) {
   btn.textContent = '⏳';
   locRequesting = true;
+  startCompass();  // 방향 표시 활성화 (iOS 권한 요청 포함)
 
   navigator.geolocation.getCurrentPosition(
     function(pos) {
       btn.textContent = '📍';
       locRequesting = false;
-      var lat = pos.coords.latitude;
-      var lng = pos.coords.longitude;
-      var acc = pos.coords.accuracy;
+      var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
       setLoc(lat, lng, acc);
       lastPos = {lat: lat, lng: lng};
-      // 반드시 flyTo 실행
       map.setView([lat, lng], 17);
       toast('📍 ' + lat.toFixed(5) + ', ' + lng.toFixed(5));
+
+      // 성공 후에만 연속 추적 시작
+      if (watcher) { navigator.geolocation.clearWatch(watcher); watcher = null; }
+      watcher = navigator.geolocation.watchPosition(
+        function(p) {
+          setLoc(p.coords.latitude, p.coords.longitude, p.coords.accuracy);
+          lastPos = {lat: p.coords.latitude, lng: p.coords.longitude};
+          if (rotLock && p.coords.heading != null && !isNaN(p.coords.heading))
+            setBearing(p.coords.heading);
+        },
+        function(){},
+        {enableHighAccuracy: true, timeout: 30000, maximumAge: 3000}
+      );
     },
     function(err) {
       btn.textContent = '📍';
       locRequesting = false;
-      var msg = {1:'위치 권한 거부됨', 2:'위치를 확인할 수 없음', 3:'시간 초과'};
-      toast('❌ ' + (msg[err.code] || err.message));
+      if (err.code === 1) {       // PERMISSION_DENIED
+        showLocationHelp('denied');
+      } else if (err.code === 2) { // POSITION_UNAVAILABLE
+        toast('❌ 위치를 확인할 수 없음 — 실내거나 GPS 신호 약함');
+      } else if (err.code === 3) { // TIMEOUT
+        toast('❌ 시간 초과 — 다시 시도하거나 야외에서 시도');
+      } else {
+        toast('❌ ' + err.message);
+      }
     },
     {enableHighAccuracy: true, timeout: 15000, maximumAge: 0}
   );
+}
 
-  // watchPosition으로 연속 추적 (내비·회전 목적)
-  if (watcher) { navigator.geolocation.clearWatch(watcher); watcher = null; }
-  watcher = navigator.geolocation.watchPosition(
-    function(pos) {
-      var lat = pos.coords.latitude, lng = pos.coords.longitude;
-      setLoc(lat, lng, pos.coords.accuracy);
-      lastPos = {lat: lat, lng: lng};
-      if (rotLock && pos.coords.heading != null && !isNaN(pos.coords.heading))
-        setBearing(pos.coords.heading);
-    },
-    function(){},
-    {enableHighAccuracy: true, timeout: 30000, maximumAge: 3000}
-  );
+document.getElementById('locBtn').addEventListener('click', function() {
+  if (!navigator.geolocation) { toast('❌ GPS를 지원하지 않는 기기'); return; }
+  if (!window.isSecureContext) { showLocationHelp('insecure'); return; }
+  var btn = this;
+  // Permissions API로 사전 확인 (지원 기기)
+  if (navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({name:'geolocation'}).then(function(res){
+      if (res.state === 'denied') { showLocationHelp('denied'); return; }
+      requestLocation(btn);
+    }).catch(function(){ requestLocation(btn); });
+  } else {
+    requestLocation(btn);
+  }
 });
 
 // ══ ZOOM TO POINT (구 내비게이션 기능 대체) ══
