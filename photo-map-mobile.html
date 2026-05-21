@@ -745,11 +745,15 @@ function setBearing(deg) {
   updateCompassRose();
   if (deviceHeading != null) updateLocCone(deviceHeading);
 }
+var _needleAngle = 0;  // 누적 각도(wrap 안 함) — 최단 경로 회전용
 function updateCompassRose() {
   var n = document.getElementById('northNeedle');
   if (n) {
     var b = (map.getBearing ? map.getBearing() : bearing);
-    n.style.transform = 'rotate(' + b + 'deg)';
+    // 현재 누적각에서 b까지 최단 경로(-180~180)만 더함 → 한 바퀴 도는 현상 방지
+    var diff = ((b - _needleAngle) % 360 + 540) % 360 - 180;
+    _needleAngle += diff;
+    n.style.transform = 'rotate(' + _needleAngle + 'deg)';
   }
 }
 
@@ -1252,13 +1256,16 @@ document.getElementById('gallInput').addEventListener('change', function(e){
 });
 
 // ══ INIT LAYERS ══
+// 회전 시 벡터가 잘리지 않도록 큰 패딩의 공용 SVG 렌더러
+var rotRenderer = L.svg({ padding: 3 });
 function initBoundary(){
   // 선 투명도 95% 고정 / 두께·채움 투명도는 슬라이더로 조절
   var makeStyle = function(ly){ return {
     color:'#6366f1', weight: ly.weight, opacity:.95,
-    fillColor:'#6366f1', fillOpacity: ly.opacity, dashArray:'6 4'
+    fillColor:'#6366f1', fillOpacity: ly.opacity, dashArray:'6 4',
+    renderer: rotRenderer
   };};
-  LAYERS.boundary.leaf = L.geoJSON(BOUNDARY, {style: makeStyle(LAYERS.boundary)}).addTo(map);
+  LAYERS.boundary.leaf = L.geoJSON(BOUNDARY, {style: makeStyle(LAYERS.boundary), renderer: rotRenderer}).addTo(map);
   if (typeof BOUNDARY_SMJ !== 'undefined' && BOUNDARY_SMJ.length) {
     LAYERS.boundary_smj.leaf = L.polygon(BOUNDARY_SMJ, makeStyle(LAYERS.boundary_smj)).addTo(map);
     LAYERS.boundary_smj.cnt = 1;
