@@ -726,12 +726,12 @@ async function revGeocode(lat, lng) {
   return null;
 }
 var TILES = {
-  'esri-street': L.tileLayer(ESRI+'/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {maxZoom:19}),
-  'esri-sat':    L.tileLayer(ESRI+'/World_Imagery/MapServer/tile/{z}/{y}/{x}',    {maxZoom:19}),
-  'esri-topo':   L.tileLayer(ESRI+'/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',   {maxZoom:19})
+  'esri-street': L.tileLayer(ESRI+'/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, keepBuffer:4, updateWhenIdle:false}),
+  'esri-sat':    L.tileLayer(ESRI+'/World_Imagery/MapServer/tile/{z}/{y}/{x}',    {maxZoom:19, keepBuffer:4, updateWhenIdle:false}),
+  'esri-topo':   L.tileLayer(ESRI+'/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',   {maxZoom:19, keepBuffer:4, updateWhenIdle:false})
 };
 var curTile = (_bk
-  ? L.tileLayer('https://api.vworld.kr/req/wmts/1.0.0/'+_bk+'/Base/{z}/{y}/{x}.png',{maxZoom:19,crossOrigin:true})
+  ? L.tileLayer('https://api.vworld.kr/req/wmts/1.0.0/'+_bk+'/Base/{z}/{y}/{x}.png',{maxZoom:19,crossOrigin:true,keepBuffer:4,updateWhenIdle:false})
   : TILES['esri-street']
 ).addTo(map);
 
@@ -739,7 +739,7 @@ function vwUrl(t, e) {
   var base = PROXY
     ? PROXY + '/wmts/' + t + '/{z}/{y}/{x}.' + (e||'png')
     : 'https://api.vworld.kr/req/wmts/1.0.0/' + vwKey + '/' + t + '/{z}/{y}/{x}.' + (e||'png');
-  return L.tileLayer(base, {maxZoom:19, crossOrigin:true});
+  return L.tileLayer(base, {maxZoom:19, crossOrigin:true, keepBuffer:4, updateWhenIdle:false});
 }
 function setTile(k) {
   if (k === curKey) return;
@@ -1327,6 +1327,17 @@ document.getElementById('gallInput').addEventListener('change', function(e){
 // ══ INIT LAYERS ══
 // ── 경계 커스텀 오버레이 (회전 중에도 정확) ──
 // 마커와 동일한 회전 좌표계로 직접 그려, 플러그인의 벡터 회전 버그를 우회
+function simplifyRing(ring, tol){
+  // 인접 중복점 제거(거리 tol 이하) — 모양 유지하며 점 수 감소 → 다시 그리기 비용↓
+  if (!ring || ring.length <= 4) return ring;
+  var out = [ring[0]], last = ring[0], t2 = tol*tol;
+  for (var i=1; i<ring.length-1; i++){
+    var dy = ring[i][0]-last[0], dx = ring[i][1]-last[1];
+    if (dx*dx + dy*dy >= t2){ out.push(ring[i]); last = ring[i]; }
+  }
+  out.push(ring[ring.length-1]);
+  return out;
+}
 function bndRings(){
   // 청림동(geoJSON): coordinates [[[lng,lat],...]] → [[lat,lng],...]
   try {
@@ -1340,6 +1351,15 @@ function bndRings(){
   LAYERS.boundary.cnt = LAYERS.boundary.rings.length ? 1 : 0;
   LAYERS.boundary_smj.cnt = LAYERS.boundary_smj.rings.length ? 1 : 0;
   LAYERS.boundary_sj.cnt = LAYERS.boundary_sj.rings.length ? 1 : 0;
+  // 간소화(약 3m) + 경계별 bbox 계산(화면 밖 컬링용)
+  ['boundary','boundary_smj','boundary_sj'].forEach(function(id){
+    var ly = LAYERS[id];
+    if (!ly.rings || !ly.rings.length) { ly._bbox = null; return; }
+    ly.rings = ly.rings.map(function(r){ return simplifyRing(r, 0.00003); });
+    var b = L.latLngBounds();
+    ly.rings.forEach(function(r){ r.forEach(function(ll){ b.extend(ll); }); });
+    ly._bbox = b.isValid() ? b : null;
+  });
 }
 var bndSvg = null, bndPaneEl = null, _bndRaf = null, _bndPaths = {};
 function initBoundary(){
@@ -1378,10 +1398,13 @@ function requestBndDraw(){
 }
 function drawBoundaries(){
   if (!bndSvg) return;
+  var view = null;
+  try { view = map.getBounds().pad(0.3); } catch(_){}   // 회전 포함 현재 화면 범위(여유 30%)
   ['boundary','boundary_smj','boundary_sj'].forEach(function(id){
     var ly = LAYERS[id], path = _bndPaths[id];
     if (!path) return;
     if (!ly || !ly.visible || !ly.rings || !ly.rings.length) { path.setAttribute('d',''); return; }
+    if (view && ly._bbox && !view.intersects(ly._bbox)) { path.setAttribute('d',''); return; } // 화면 밖이면 건너뜀
     var d = '';
     ly.rings.forEach(function(ring){
       for (var i=0; i<ring.length; i++){
@@ -3329,7 +3352,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'build 2026-05-21 · 20:30';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'build 2026-05-21 · 21:00';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
   requestAnimationFrame(function(){
