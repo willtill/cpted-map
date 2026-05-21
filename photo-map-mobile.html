@@ -6,7 +6,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0f172a">
-<title>CPTED 분석</title>
+<title>CPTED MAP</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -84,6 +84,13 @@ html,body{width:100%;height:100%;overflow:hidden;
   box-shadow:0 2px 10px rgba(0,0,0,.4);}
 .mc:active{opacity:.7;}
 .mc.on{background:rgba(59,130,246,.25);border-color:var(--accent);}
+/* 정북/방위 버튼: 원형 흰배경 */
+.mc-north{border-radius:50%;background:#fff;border:1.5px solid rgba(0,0,0,.12);
+  box-shadow:0 2px 10px rgba(0,0,0,.35);}
+.mc-north:active{opacity:1;transform:scale(.92);}
+#northNeedle{transition:transform .12s linear;transform-origin:50% 50%;}
+/* 줌 +/- 흰색 글자 */
+#ziBtn, #zoBtn{color:#fff;font-weight:700;}
 
 /* ── FAB ── */
 .fab-wrap{
@@ -298,14 +305,7 @@ html,body{width:100%;height:100%;overflow:hidden;
   z-index:999;transform:scaleX(0);transform-origin:left;transition:transform .25s;}
 
 /* ── COMPASS ── */
-.compass-rose{position:fixed;top:calc(var(--safe-t)+64px);left:14px;z-index:95;
-  width:52px;height:52px;border-radius:50%;
-  background:rgba(15,23,42,.88);border:1.5px solid rgba(255,255,255,.3);
-  backdrop-filter:blur(8px);cursor:pointer;
-  box-shadow:0 3px 10px rgba(0,0,0,.4);
-  transition:transform .12s linear;}
-.compass-rose:active{transform:scale(.92);}
-.compass-rose svg{width:100%;height:100%;display:block;}
+
 
 /* ── LOC MARKER (구글맵 스타일 방향 콘) ── */
 .loc-marker{position:relative;width:48px;height:48px;}
@@ -395,7 +395,7 @@ html,body{width:100%;height:100%;overflow:hidden;
 
 <!-- TOP BAR -->
 <div class="top">
-  <div class="top-logo">CPTED 분석</div>
+  <div class="top-logo">CPTED MAP</div>
   <div class="chip" style="color:#10b981;border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.08)">📷<b id="pcnt">0</b></div>
   <div class="chip" style="color:#f59e0b;border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.08)">📋<b id="scnt">0</b></div>
   <div class="chip vw-ok on" id="vwOk" style="cursor:default;pointer-events:none;">🗝VWorld</div>
@@ -404,12 +404,12 @@ html,body{width:100%;height:100%;overflow:hidden;
 </div>
 
 <!-- COMPASS -->
-<div class="compass-rose" id="compassRose" title="탭하면 정북 정렬"><svg viewBox="0 0 46 46"><circle cx="23" cy="23" r="21" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="1"/><polygon points="23,7 18,23 28,23" fill="#ef4444"/><polygon points="23,39 18,23 28,23" fill="#94a3b8"/><circle cx="23" cy="23" r="2.5" fill="#fff"/><text x="23" y="6" text-anchor="middle" font-size="7" font-weight="700" fill="#fff">N</text></svg></div>
 
 <!-- MAP CONTROLS -->
 <div class="mctrl">
+  <button class="mc mc-north" id="northBtn" title="방위 표시 · 탭하면 정북 복귀"><svg id="northNeedle" width="26" height="26" viewBox="0 0 26 26"><text x="13" y="7" text-anchor="middle" font-size="7" font-weight="700" fill="#1e293b">N</text><polygon points="13,8 9,19 13,16 17,19" fill="#ef4444"/></svg></button>
   <button class="mc" id="locBtn">📍</button>
-  <button class="mc" id="rotBtn">🧭</button>
+  <button class="mc" id="rotBtn" title="네비게이션 모드(방향따라 회전)">🧭</button>
   <button class="mc" id="ziBtn">＋</button>
   <button class="mc" id="zoBtn">－</button>
 </div>
@@ -489,7 +489,7 @@ html,body{width:100%;height:100%;overflow:hidden;
 
 <!-- SCRIPTS AT END OF BODY -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
 <script>
 // ── VWorld 키 사전 초기화 ──
@@ -619,14 +619,14 @@ var map = L.map('map', {
   bearing: 0
 });
 
-// 회전 플러그인 로드 진단 (콘솔 + 토스트)
+// 회전 플러그인 로드 진단
 setTimeout(function(){
   var ok = !!(map.setBearing && map._rotate);
   if (ok) {
-    console.log('%c✓ leaflet-rotate 활성 — 회전·pan보정·방위표 사용 가능', 'color:#16a34a;font-weight:bold');
+    console.log('%c✓ leaflet-rotate 활성', 'color:#16a34a;font-weight:bold');
   } else {
-    console.warn('⚠ leaflet-rotate 미로드 — 회전 기능 비활성. unpkg.com 접속 차단/네트워크 문제 가능');
-    if (typeof toast === 'function') toast('⚠ 회전 플러그인 로드 실패 — 네트워크 확인 필요');
+    console.warn('⚠ leaflet-rotate 미로드 — CDN 차단/네트워크 문제');
+    if (typeof toast === 'function') toast('⚠ 회전 플러그인 로드 실패 — 네트워크/CDN 확인');
   }
 }, 1800);
 
@@ -738,10 +738,10 @@ function setBearing(deg) {
   if (deviceHeading != null) updateLocCone(deviceHeading);
 }
 function updateCompassRose() {
-  var r = document.getElementById('compassRose');
-  if (r) {
+  var n = document.getElementById('northNeedle');
+  if (n) {
     var b = (map.getBearing ? map.getBearing() : bearing);
-    r.style.transform = 'rotate(' + b + 'deg)';
+    n.style.transform = 'rotate(' + b + 'deg)';
   }
 }
 
@@ -769,6 +769,11 @@ function resetNorth() {
   setBearing(0);
   toast('🧭 정북 정렬');
 }
+// 정북 복귀 버튼 (우측 최상단)
+(function(){
+  var n = document.getElementById('northBtn');
+  if (n) n.addEventListener('click', resetNorth);
+})();
 
 // ══ LOCATION ══
 var locM = null, locC = null, lastPos = null, watcher = null;
@@ -859,11 +864,6 @@ function startCompass() {
   }
 }
 var locRequesting = false;
-// 방위표 탭 → 정북 정렬
-(function(){
-  var rose = document.getElementById('compassRose');
-  if (rose) rose.addEventListener('click', resetNorth);
-})();
 
 // 위치 권한 거부 시 기기별 해결 안내
 function showLocationHelp(reason) {
@@ -1419,7 +1419,7 @@ function buildPhotoInfoRows(p) {
   // ── 2. CPTED 분류 카드 (강조)
   if (cats.length || rating || tags.length) {
     rows += '<div style="margin:12px 0;padding:12px 14px;background:rgba(37,99,235,.06);border-left:3px solid var(--accent);border-radius:8px;">';
-    rows += '<div style="font-size:10px;font-weight:700;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">CPTED 분석</div>';
+    rows += '<div style="font-size:10px;font-weight:700;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">CPTED MAP</div>';
     if (cats.length) rows += '<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px;">📌 '+cats.join(' · ')+'</div>';
     if (rating)      rows += '<div style="font-size:14px;margin-bottom:4px;">'
       +'<span style="color:var(--yellow);letter-spacing:2px;">'+'★'.repeat(rating)+'<span style="opacity:.25">'+'★'.repeat(5-rating)+'</span></span>'
@@ -3199,14 +3199,14 @@ document.addEventListener('click', function(e) {
 
   updCounts();
 
-  // Fit map + invalidateSize
+  // 시작 뷰: 현재 위치 우선(아래 geolocation), 못 잡으면 가장 최근 추가된 사례지로 폴백
+  var startLocated = false;
   setTimeout(function(){
     map.invalidateSize(true);
-    var pts=VACANT.map(function(h){return[h.lat,h.lng];})
-      .concat(LIGHTS.map(function(i){return[i.lat,i.lng];}))
-      .concat(CCTV.map(function(i){return[i.lat,i.lng];}));
-    if(pts.length) map.fitBounds(pts,{padding:[40,80]});
-    // Switch to VWorld if key is set
+    if (!startLocated) {
+      var lastR = REGIONS[REGIONS.length - 1];  // 가장 최근 사례지
+      if (lastR && lastR.center) map.setView(lastR.center, lastR.zoom || 16);
+    }
     if(vwKey && st==='esri-street') setTile('vw-base');
   }, 200);
 
@@ -3220,8 +3220,10 @@ document.addEventListener('click', function(e) {
         var lat=pos.coords.latitude, lng=pos.coords.longitude;
         setLoc(lat, lng, pos.coords.accuracy);
         lastPos = {lat:lat, lng:lng};
+        startLocated = true;
+        map.setView([lat, lng], 17);  // 앱 시작 시 현재 위치로 이동
       },
-      function(){},
+      function(){ /* 실패·거부 시 폴백(마지막 사례지) 유지 */ },
       {enableHighAccuracy:true, timeout:10000, maximumAge:30000}
     );
     // 백그라운드 연속 추적 시작
