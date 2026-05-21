@@ -30,6 +30,12 @@ html,body{width:100%;height:100%;overflow:hidden;
   bottom:calc(var(--nav) + var(--safe-b));
   z-index:1;
 }
+/* 회전 시: 화면보다 크게 만들어 모서리 빈공간 방지 (블러 없음) */
+#map.rot{
+  width:170vmax;height:170vmax;
+  top:50%;left:50%;right:auto;bottom:auto;
+  margin:-85vmax 0 0 -85vmax;
+}
 
 /* ── TOP BAR ── */
 .top{
@@ -306,11 +312,12 @@ html,body{width:100%;height:100%;overflow:hidden;
 .compass.on{display:flex;}
 
 /* ── LOC MARKER (구글맵 스타일 방향 콘) ── */
-.loc-marker{position:relative;width:34px;height:34px;}
-.loc-cone{position:absolute;left:0;top:0;width:34px;height:34px;
+.loc-marker{position:relative;width:48px;height:48px;}
+.loc-cone{position:absolute;left:0;top:0;width:48px;height:48px;
   transform-origin:50% 50%;
-  transition:transform .1s linear;
-  pointer-events:none;display:none;}
+  transition:transform .12s linear;
+  pointer-events:none;display:none;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));}
 .loc-dot{position:absolute;left:50%;top:50%;
   width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;
   background:#2563eb;border:3px solid #fff;
@@ -712,9 +719,15 @@ document.getElementById('zoBtn').addEventListener('click', function(){ map.zoomO
 // ══ ROTATION ══
 var bearing = 0, navMode = false;
 function setBearing(deg) {
+  var wasRot = (bearing !== 0);
   bearing = ((deg % 360) + 360) % 360;
-  // 지도 컨테이너 전체를 회전 (클릭 좌표는 브라우저가 transform 통해 자동 보정)
+  var nowRot = (bearing !== 0);
   var c = map.getContainer();
+  // 회전 시작/종료 시에만 컨테이너 크기 토글 (모서리 덮기, 블러 없이)
+  if (c && nowRot !== wasRot) {
+    if (nowRot) c.classList.add('rot'); else c.classList.remove('rot');
+    map.invalidateSize({animate:false});
+  }
   if (c) {
     c.style.transformOrigin = '50% 50%';
     c.style.transform = bearing ? ('rotate(-' + bearing + 'deg)') : '';
@@ -724,9 +737,7 @@ function setBearing(deg) {
     el.style.transform = (el.style.transform || '').replace(/rotate\([^)]+\)/, '') +
       (bearing ? ' rotate(' + bearing + 'deg)' : '');
   });
-  // 방향 콘 갱신
   if (deviceHeading != null) updateLocCone(deviceHeading);
-  // 나침반 표시기
   var comp = document.getElementById('compass');
   if (comp) {
     comp.style.transform = 'translateX(-50%) rotate(-' + bearing + 'deg)';
@@ -787,8 +798,8 @@ function setLoc(lat, lng, acc) {
   if (!locM) {
     locM = L.marker([lat,lng], {
       icon: L.divIcon({
-        html:'<div class="loc-marker"><svg class="loc-cone" id="locCone" viewBox="0 0 34 34" width="34" height="34"><path d="M17 3 L24 17 Q17 14 10 17 Z" fill="rgba(37,99,235,.85)" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg><div class="loc-dot"></div></div>',
-        className:'', iconSize:[26,26], iconAnchor:[13,13]
+        html:'<div class="loc-marker"><svg class="loc-cone" id="locCone" viewBox="0 0 48 48" width="48" height="48"><path d="M24 4 L31 16 Q24 13 17 16 Z" fill="rgba(37,99,235,.9)" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg><div class="loc-dot"></div></div>',
+        className:'', iconSize:[48,48], iconAnchor:[24,24]
       }),
       zIndexOffset: 1000
     }).addTo(map);
@@ -807,43 +818,62 @@ function updateLocCone(h) {
   var cone = document.getElementById('locCone');
   if (cone) {
     cone.style.display = 'block';
-    // 콘은 항상 절대 방위를 가리킴 (지도 회전 보정)
     cone.style.transform = 'rotate(' + (h - bearing) + 'deg)';
   }
 }
+// 원형(circular) 이동평균으로 나침반 노이즈 평활화
+var _headBuf = [];
+function smoothHeading(h) {
+  _headBuf.push(h);
+  if (_headBuf.length > 8) _headBuf.shift();
+  var sx=0, sy=0;
+  _headBuf.forEach(function(a){ sx += Math.cos(a*Math.PI/180); sy += Math.sin(a*Math.PI/180); });
+  return (((Math.atan2(sy, sx)*180/Math.PI) % 360) + 360) % 360;
+}
 function startCompass() {
   if (compassStarted) return;
-  var _lastNavRot = 0;
+  var _lastNavRot = 0, _lastApplied = -999;
   function onOrient(e) {
     var h = null;
-    if (e.webkitCompassHeading != null) h = e.webkitCompassHeading;     // iOS: 정북 기준 시계방향
-    else if (e.alpha != null) h = 360 - e.alpha;                         // Android: alpha 보정
-    if (h != null && !isNaN(h)) {
-      deviceHeading = ((h % 360) + 360) % 360;
-      // 네비게이션 모드: 지도 자동 회전 (150ms throttle로 부드럽게)
-      if (navMode) {
-        var now = Date.now();
-        if (now - _lastNavRot > 150) { _lastNavRot = now; setBearing(deviceHeading); }
-      } else {
-        updateLocCone(deviceHeading);
+    if (e.webkitCompassHeading != null) {
+      h = e.webkitCompassHeading;                 // iOS: 정북 기준 시계방향(정확)
+    } else if (e.alpha != null) {
+      h = 360 - e.alpha;                          // Android alpha
+      // 화면 세로/가로 회전 보정
+      var so = 0;
+      if (screen.orientation && screen.orientation.angle != null) so = screen.orientation.angle;
+      else if (window.orientation != null) so = window.orientation;
+      h = h - so;
+    }
+    if (h == null || isNaN(h)) return;
+    h = ((h % 360) + 360) % 360;
+    var sh = smoothHeading(h);
+    deviceHeading = sh;
+    if (navMode) {
+      var now = Date.now();
+      // 변화량 5° 이상 + 250ms 간격일 때만 회전 (떨림 방지)
+      var diff = Math.abs(((sh - _lastApplied + 540) % 360) - 180);
+      if (now - _lastNavRot > 250 && diff > 5) {
+        _lastNavRot = now; _lastApplied = sh; setBearing(sh);
       }
+    } else {
+      updateLocCone(sh);
     }
   }
-  // iOS 13+ : 권한 요청 (사용자 제스처 필요 — locBtn 클릭에서 호출됨)
-  if (typeof DeviceOrientationEvent !== 'undefined' &&
+  // deviceorientationabsolute 우선 (절대 방위 — 안드로이드 안정성 ↑)
+  if ('ondeviceorientationabsolute' in window) {
+    window.addEventListener('deviceorientationabsolute', onOrient, true);
+    compassStarted = true;
+  } else if (typeof DeviceOrientationEvent !== 'undefined' &&
       typeof DeviceOrientationEvent.requestPermission === 'function') {
     DeviceOrientationEvent.requestPermission().then(function(resp){
       if (resp === 'granted') {
         window.addEventListener('deviceorientation', onOrient, true);
         compassStarted = true;
         toast('🧭 방향 표시 활성화');
-      } else {
-        toast('나침반 권한 거부됨');
-      }
+      } else { toast('나침반 권한 거부됨'); }
     }).catch(function(){});
   } else {
-    // Android·기타: 권한 불필요
-    window.addEventListener('deviceorientationabsolute', onOrient, true);
     window.addEventListener('deviceorientation', onOrient, true);
     compassStarted = true;
   }
