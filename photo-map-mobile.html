@@ -306,23 +306,19 @@ html,body{width:100%;height:100%;overflow:hidden;
 .compass.on{display:flex;}
 
 /* ── LOC MARKER (구글맵 스타일 방향 콘) ── */
-.loc-marker{position:relative;width:26px;height:26px;}
-.loc-cone{position:absolute;left:50%;top:50%;width:0;height:0;
-  border-left:16px solid transparent;border-right:16px solid transparent;
-  border-bottom:36px solid rgba(37,99,235,.55);
-  transform-origin:50% 100%;
-  transform:translate(-50%,-100%) rotate(0deg);
+.loc-marker{position:relative;width:34px;height:34px;}
+.loc-cone{position:absolute;left:0;top:0;width:34px;height:34px;
+  transform-origin:50% 50%;
   transition:transform .1s linear;
-  pointer-events:none;display:none;
-  filter:drop-shadow(0 0 4px rgba(37,99,235,.5));}
+  pointer-events:none;display:none;}
 .loc-dot{position:absolute;left:50%;top:50%;
-  width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;
+  width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;
   background:#2563eb;border:3px solid #fff;
   box-shadow:0 0 0 1.5px rgba(0,0,0,.3),0 1px 7px rgba(0,0,0,.55);
   z-index:2;}
-.loc-dot::after{content:'';position:absolute;inset:-9px;border-radius:50%;
+.loc-dot::after{content:'';position:absolute;inset:-8px;border-radius:50%;
   border:2px solid rgba(37,99,235,.45);animation:locpulse 2s ease-out infinite;}
-@keyframes locpulse{0%{transform:scale(.6);opacity:.8;}100%{transform:scale(1.6);opacity:0;}}
+@keyframes locpulse{0%{transform:scale(.6);opacity:.8;}100%{transform:scale(1.7);opacity:0;}}
 
 /* Leaflet override */
 .leaflet-control-zoom{display:none;}
@@ -714,29 +710,75 @@ document.getElementById('ziBtn').addEventListener('click', function(){ map.zoomI
 document.getElementById('zoBtn').addEventListener('click', function(){ map.zoomOut(); });
 
 // ══ ROTATION ══
-var bearing = 0, rotLock = false;
+var bearing = 0, navMode = false;
 function setBearing(deg) {
   bearing = ((deg % 360) + 360) % 360;
-  var pane = map.getPanes().mapPane;
-  if (pane) pane.style.transform = 'rotate(-' + bearing + 'deg)';
+  // 지도 컨테이너 전체를 회전 (클릭 좌표는 브라우저가 transform 통해 자동 보정)
+  var c = map.getContainer();
+  if (c) {
+    c.style.transformOrigin = '50% 50%';
+    c.style.transform = bearing ? ('rotate(-' + bearing + 'deg)') : '';
+  }
+  // 마커는 수직 유지 (역회전)
   document.querySelectorAll('.leaflet-marker-icon').forEach(function(el) {
     el.style.transform = (el.style.transform || '').replace(/rotate\([^)]+\)/, '') +
       (bearing ? ' rotate(' + bearing + 'deg)' : '');
   });
+  // 방향 콘 갱신
+  if (deviceHeading != null) updateLocCone(deviceHeading);
+  // 나침반 표시기
   var comp = document.getElementById('compass');
-  comp.style.transform = 'translateX(-50%) rotate(-' + bearing + 'deg)';
-  if (bearing) comp.classList.add('on'); else comp.classList.remove('on');
+  if (comp) {
+    comp.style.transform = 'translateX(-50%) rotate(-' + bearing + 'deg)';
+    if (bearing) comp.classList.add('on'); else comp.classList.remove('on');
+  }
 }
+
+// 네비게이션 모드: 기기 방향에 따라 지도 자동 회전
 document.getElementById('rotBtn').addEventListener('click', function() {
-  rotLock = !rotLock;
-  this.classList.toggle('on', rotLock);
-  toast(rotLock ? '🧭 방향 고정 ON' : '🧭 방향 고정 OFF');
-  if (!rotLock) setBearing(0);
+  navMode = !navMode;
+  this.classList.toggle('on', navMode);
+  if (navMode) {
+    startCompass();  // 나침반 활성화 (iOS 권한 포함)
+    toast('🧭 네비게이션 모드 ON — 보는 방향으로 지도 회전');
+    if (deviceHeading != null) setBearing(deviceHeading);
+  } else {
+    toast('🧭 네비게이션 모드 OFF');
+    setBearing(0);  // 정북 복귀
+  }
 });
+// 나침반 아이콘 클릭 → 정북 복귀 + 네비 모드 해제
 document.getElementById('compass').addEventListener('click', function() {
-  setBearing(0); rotLock = false;
+  navMode = false;
   document.getElementById('rotBtn').classList.remove('on');
+  setBearing(0);
+  toast('🧭 정북 정렬');
 });
+
+// ── 일반 모드 수동 회전: 두 손가락 비틀기 제스처 ──
+(function(){
+  var mapEl = document.getElementById('map');
+  if (!mapEl) return;
+  var startAngle = null, baseBearing = 0;
+  function twoFingerAngle(t){
+    return Math.atan2(t[1].clientY - t[0].clientY, t[1].clientX - t[0].clientX) * 180 / Math.PI;
+  }
+  mapEl.addEventListener('touchstart', function(e){
+    if (e.touches.length === 2 && !navMode) {
+      startAngle = twoFingerAngle(e.touches);
+      baseBearing = bearing;
+    }
+  }, {passive:true});
+  mapEl.addEventListener('touchmove', function(e){
+    if (e.touches.length === 2 && startAngle != null && !navMode) {
+      var delta = twoFingerAngle(e.touches) - startAngle;
+      setBearing(baseBearing - delta);
+    }
+  }, {passive:true});
+  mapEl.addEventListener('touchend', function(e){
+    if (!e.touches || e.touches.length < 2) startAngle = null;
+  }, {passive:true});
+})();
 
 // ══ LOCATION ══
 var locM = null, locC = null, lastPos = null, watcher = null;
@@ -745,7 +787,7 @@ function setLoc(lat, lng, acc) {
   if (!locM) {
     locM = L.marker([lat,lng], {
       icon: L.divIcon({
-        html:'<div class="loc-marker"><div class="loc-cone" id="locCone"></div><div class="loc-dot"></div></div>',
+        html:'<div class="loc-marker"><svg class="loc-cone" id="locCone" viewBox="0 0 34 34" width="34" height="34"><path d="M17 3 L24 17 Q17 14 10 17 Z" fill="rgba(37,99,235,.85)" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg><div class="loc-dot"></div></div>',
         className:'', iconSize:[26,26], iconAnchor:[13,13]
       }),
       zIndexOffset: 1000
@@ -765,19 +807,26 @@ function updateLocCone(h) {
   var cone = document.getElementById('locCone');
   if (cone) {
     cone.style.display = 'block';
-    // 지도 회전(rotLock) 보정: 콘은 항상 절대 방위를 가리킴
-    cone.style.transform = 'translate(-50%,-100%) rotate(' + (h - bearing) + 'deg)';
+    // 콘은 항상 절대 방위를 가리킴 (지도 회전 보정)
+    cone.style.transform = 'rotate(' + (h - bearing) + 'deg)';
   }
 }
 function startCompass() {
   if (compassStarted) return;
+  var _lastNavRot = 0;
   function onOrient(e) {
     var h = null;
     if (e.webkitCompassHeading != null) h = e.webkitCompassHeading;     // iOS: 정북 기준 시계방향
     else if (e.alpha != null) h = 360 - e.alpha;                         // Android: alpha 보정
     if (h != null && !isNaN(h)) {
       deviceHeading = ((h % 360) + 360) % 360;
-      updateLocCone(deviceHeading);
+      // 네비게이션 모드: 지도 자동 회전 (150ms throttle로 부드럽게)
+      if (navMode) {
+        var now = Date.now();
+        if (now - _lastNavRot > 150) { _lastNavRot = now; setBearing(deviceHeading); }
+      } else {
+        updateLocCone(deviceHeading);
+      }
     }
   }
   // iOS 13+ : 권한 요청 (사용자 제스처 필요 — locBtn 클릭에서 호출됨)
@@ -877,8 +926,7 @@ function requestLocation(btn) {
         function(p) {
           setLoc(p.coords.latitude, p.coords.longitude, p.coords.accuracy);
           lastPos = {lat: p.coords.latitude, lng: p.coords.longitude};
-          if (rotLock && p.coords.heading != null && !isNaN(p.coords.heading))
-            setBearing(p.coords.heading);
+          // 네비 모드 회전은 나침반(deviceHeading)이 담당 — GPS heading 사용 안 함
         },
         function(){},
         {enableHighAccuracy: true, timeout: 30000, maximumAge: 3000}
@@ -888,7 +936,7 @@ function requestLocation(btn) {
       btn.textContent = '📍';
       locRequesting = false;
       if (err.code === 1) {       // PERMISSION_DENIED
-        showLocationHelp('denied');
+        toast('📍 위치 권한이 거부됨 — 브라우저 설정에서 허용 필요');
       } else if (err.code === 2) { // POSITION_UNAVAILABLE
         toast('❌ 위치를 확인할 수 없음 — 실내거나 GPS 신호 약함');
       } else if (err.code === 3) { // TIMEOUT
@@ -903,12 +951,12 @@ function requestLocation(btn) {
 
 document.getElementById('locBtn').addEventListener('click', function() {
   if (!navigator.geolocation) { toast('❌ GPS를 지원하지 않는 기기'); return; }
-  if (!window.isSecureContext) { showLocationHelp('insecure'); return; }
+  if (!window.isSecureContext) { toast('📍 위치 기능은 HTTPS(willtill.github.io)에서만 작동'); return; }
   var btn = this;
   // Permissions API로 사전 확인 (지원 기기)
   if (navigator.permissions && navigator.permissions.query) {
     navigator.permissions.query({name:'geolocation'}).then(function(res){
-      if (res.state === 'denied') { showLocationHelp('denied'); return; }
+      if (res.state === 'denied') { toast('📍 위치 권한이 거부됨 — 브라우저 설정에서 허용 필요'); return; }
       requestLocation(btn);
     }).catch(function(){ requestLocation(btn); });
   } else {
@@ -3158,8 +3206,7 @@ document.addEventListener('click', function(e) {
         setLoc(lat, lng, pos.coords.accuracy);
         lastPos = {lat:lat, lng:lng};
         if (naviDest) updateNavi(lat, lng);
-        if (rotLock && pos.coords.heading!=null && !isNaN(pos.coords.heading))
-          setBearing(pos.coords.heading);
+        // 네비 모드 회전은 나침반(deviceHeading)이 담당
       },
       function(){},
       {enableHighAccuracy:true, timeout:30000, maximumAge:3000}
