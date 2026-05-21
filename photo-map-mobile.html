@@ -630,6 +630,14 @@ setTimeout(function(){
   }
 }, 1800);
 
+// 모든 회전(두 손가락·shift휠·네비 등)에서 방위표 needle + 위치 콘 갱신
+if (map.on) {
+  map.on('rotate', function(){
+    updateCompassRose();
+    if (deviceHeading != null) updateLocCone(deviceHeading);
+  });
+}
+
 var ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services';
 var curKey = _bk ? 'vw-base' : 'esri-street';
 var hybridBase = null;
@@ -3212,6 +3220,9 @@ document.addEventListener('click', function(e) {
 
   if(savedP.length+savedS.length>0)
     toast('💾 사진 '+savedP.length+'개, 조사 '+savedS.length+'건 복원');
+
+  // 앱 시작 시 나침반 시작 (방향 콘 표시 — 안드로이드 즉시, iOS는 권한 탭 후)
+  startCompass();
 
   // 앱 시작 시 자동 위치 요청
   if (navigator.geolocation) {
