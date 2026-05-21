@@ -30,12 +30,7 @@ html,body{width:100%;height:100%;overflow:hidden;
   bottom:calc(var(--nav) + var(--safe-b));
   z-index:1;
 }
-/* 회전 시: 화면보다 크게 만들어 모서리 빈공간 방지 (블러 없음) */
-#map.rot{
-  width:170vmax;height:170vmax;
-  top:50%;left:50%;right:auto;bottom:auto;
-  margin:-85vmax 0 0 -85vmax;
-}
+
 
 /* ── TOP BAR ── */
 .top{
@@ -303,13 +298,13 @@ html,body{width:100%;height:100%;overflow:hidden;
   z-index:999;transform:scaleX(0);transform-origin:left;transition:transform .25s;}
 
 /* ── COMPASS ── */
-.compass{position:fixed;top:calc(var(--safe-t)+60px);left:50%;
-  transform:translateX(-50%);z-index:90;
-  width:40px;height:40px;border-radius:50%;
-  background:rgba(15,23,42,.82);border:1px solid rgba(255,255,255,.2);
-  backdrop-filter:blur(8px);display:none;align-items:center;
-  justify-content:center;font-size:20px;cursor:pointer;}
-.compass.on{display:flex;}
+.compass-rose{position:fixed;top:calc(var(--safe-t)+58px);left:14px;z-index:90;
+  width:46px;height:46px;border-radius:50%;
+  background:rgba(15,23,42,.82);border:1px solid rgba(255,255,255,.25);
+  backdrop-filter:blur(8px);cursor:pointer;
+  box-shadow:0 2px 8px rgba(0,0,0,.35);
+  transition:transform .12s linear;}
+.compass-rose svg{width:100%;height:100%;display:block;}
 
 /* ── LOC MARKER (구글맵 스타일 방향 콘) ── */
 .loc-marker{position:relative;width:48px;height:48px;}
@@ -408,7 +403,7 @@ html,body{width:100%;height:100%;overflow:hidden;
 </div>
 
 <!-- COMPASS -->
-<div class="compass" id="compass">🧭</div>
+<div class="compass-rose" id="compassRose" title="탭하면 정북 정렬"><svg viewBox="0 0 46 46"><circle cx="23" cy="23" r="21" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="1"/><polygon points="23,7 18,23 28,23" fill="#ef4444"/><polygon points="23,39 18,23 28,23" fill="#94a3b8"/><circle cx="23" cy="23" r="2.5" fill="#fff"/><text x="23" y="6" text-anchor="middle" font-size="7" font-weight="700" fill="#fff">N</text></svg></div>
 
 <!-- MAP CONTROLS -->
 <div class="mctrl">
@@ -493,6 +488,7 @@ html,body{width:100%;height:100%;overflow:hidden;
 
 <!-- SCRIPTS AT END OF BODY -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
 <script>
 // ── VWorld 키 사전 초기화 ──
@@ -615,7 +611,11 @@ var map = L.map('map', {
   center: [35.9975, 129.415],
   zoom: 16,
   zoomControl: false,
-  attributionControl: false
+  attributionControl: false,
+  rotate: true,          // leaflet-rotate: 회전 지원
+  touchRotate: true,     // 두 손가락 회전 제스처 (pan·줌과 함께 올바르게 작동)
+  rotateControl: false,  // 커스텀 방위표 사용
+  bearing: 0
 });
 
 var ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services';
@@ -719,29 +719,17 @@ document.getElementById('zoBtn').addEventListener('click', function(){ map.zoomO
 // ══ ROTATION ══
 var bearing = 0, navMode = false;
 function setBearing(deg) {
-  var wasRot = (bearing !== 0);
   bearing = ((deg % 360) + 360) % 360;
-  var nowRot = (bearing !== 0);
-  var c = map.getContainer();
-  // 회전 시작/종료 시에만 컨테이너 크기 토글 (모서리 덮기, 블러 없이)
-  if (c && nowRot !== wasRot) {
-    if (nowRot) c.classList.add('rot'); else c.classList.remove('rot');
-    map.invalidateSize({animate:false});
-  }
-  if (c) {
-    c.style.transformOrigin = '50% 50%';
-    c.style.transform = bearing ? ('rotate(-' + bearing + 'deg)') : '';
-  }
-  // 마커는 수직 유지 (역회전)
-  document.querySelectorAll('.leaflet-marker-icon').forEach(function(el) {
-    el.style.transform = (el.style.transform || '').replace(/rotate\([^)]+\)/, '') +
-      (bearing ? ' rotate(' + bearing + 'deg)' : '');
-  });
+  // 플러그인이 회전·pan·모서리·마커를 모두 처리
+  if (map.setBearing) map.setBearing(bearing);
+  updateCompassRose();
   if (deviceHeading != null) updateLocCone(deviceHeading);
-  var comp = document.getElementById('compass');
-  if (comp) {
-    comp.style.transform = 'translateX(-50%) rotate(-' + bearing + 'deg)';
-    if (bearing) comp.classList.add('on'); else comp.classList.remove('on');
+}
+function updateCompassRose() {
+  var r = document.getElementById('compassRose');
+  if (r) {
+    var b = (map.getBearing ? map.getBearing() : bearing);
+    r.style.transform = 'rotate(' + b + 'deg)';
   }
 }
 
@@ -751,45 +739,24 @@ document.getElementById('rotBtn').addEventListener('click', function() {
   this.classList.toggle('on', navMode);
   if (navMode) {
     startCompass();  // 나침반 활성화 (iOS 권한 포함)
+    if (map.touchRotate && map.touchRotate.disable) map.touchRotate.disable(); // 자동 회전 중 수동 회전 비활성
     toast('🧭 네비게이션 모드 ON — 보는 방향으로 지도 회전');
-    if (deviceHeading != null) setBearing(deviceHeading);
+    if (deviceHeading != null) setBearing(-deviceHeading);
   } else {
+    if (map.touchRotate && map.touchRotate.enable) map.touchRotate.enable();
     toast('🧭 네비게이션 모드 OFF');
     setBearing(0);  // 정북 복귀
   }
 });
-// 나침반 아이콘 클릭 → 정북 복귀 + 네비 모드 해제
-document.getElementById('compass').addEventListener('click', function() {
+// 방위표 클릭 → 정북 복귀 + 네비 모드 해제
+function resetNorth() {
   navMode = false;
-  document.getElementById('rotBtn').classList.remove('on');
+  var rb = document.getElementById('rotBtn');
+  if (rb) rb.classList.remove('on');
+  if (map.touchRotate && map.touchRotate.enable) map.touchRotate.enable();
   setBearing(0);
   toast('🧭 정북 정렬');
-});
-
-// ── 일반 모드 수동 회전: 두 손가락 비틀기 제스처 ──
-(function(){
-  var mapEl = document.getElementById('map');
-  if (!mapEl) return;
-  var startAngle = null, baseBearing = 0;
-  function twoFingerAngle(t){
-    return Math.atan2(t[1].clientY - t[0].clientY, t[1].clientX - t[0].clientX) * 180 / Math.PI;
-  }
-  mapEl.addEventListener('touchstart', function(e){
-    if (e.touches.length === 2 && !navMode) {
-      startAngle = twoFingerAngle(e.touches);
-      baseBearing = bearing;
-    }
-  }, {passive:true});
-  mapEl.addEventListener('touchmove', function(e){
-    if (e.touches.length === 2 && startAngle != null && !navMode) {
-      var delta = twoFingerAngle(e.touches) - startAngle;
-      setBearing(baseBearing - delta);
-    }
-  }, {passive:true});
-  mapEl.addEventListener('touchend', function(e){
-    if (!e.touches || e.touches.length < 2) startAngle = null;
-  }, {passive:true});
-})();
+}
 
 // ══ LOCATION ══
 var locM = null, locC = null, lastPos = null, watcher = null;
@@ -818,7 +785,8 @@ function updateLocCone(h) {
   var cone = document.getElementById('locCone');
   if (cone) {
     cone.style.display = 'block';
-    cone.style.transform = 'rotate(' + (h - bearing) + 'deg)';
+    var b = (map.getBearing ? map.getBearing() : bearing);
+    cone.style.transform = 'rotate(' + (h + b) + 'deg)';
   }
 }
 // 원형(circular) 이동평균으로 나침반 노이즈 평활화
@@ -854,7 +822,7 @@ function startCompass() {
       // 변화량 5° 이상 + 250ms 간격일 때만 회전 (떨림 방지)
       var diff = Math.abs(((sh - _lastApplied + 540) % 360) - 180);
       if (now - _lastNavRot > 250 && diff > 5) {
-        _lastNavRot = now; _lastApplied = sh; setBearing(sh);
+        _lastNavRot = now; _lastApplied = sh; setBearing(-sh);
       }
     } else {
       updateLocCone(sh);
@@ -879,6 +847,11 @@ function startCompass() {
   }
 }
 var locRequesting = false;
+// 방위표 탭 → 정북 정렬
+(function(){
+  var rose = document.getElementById('compassRose');
+  if (rose) rose.addEventListener('click', resetNorth);
+})();
 
 // 위치 권한 거부 시 기기별 해결 안내
 function showLocationHelp(reason) {
@@ -1194,6 +1167,16 @@ function closeInfo() {
 document.getElementById('ov').addEventListener('click', closeAll);
 document.getElementById('shX').addEventListener('click', closeAll);
 document.getElementById('infoX').addEventListener('click', closeInfo);
+
+// ESC 키로 열린 팝업/시트 닫기 (PC)
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Escape' && e.key !== 'Esc') return;
+  var infoOpen  = document.getElementById('infoSheet').classList.contains('on');
+  var sheetOpen = document.getElementById('sheet').classList.contains('on');
+  if (infoOpen)        { closeInfo(); }     // 마커 클릭 정보창 우선
+  else if (sheetOpen)  { closeAll(); }      // 데이터·레이어·현장조사 등 시트
+  else if (typeof fabOpen !== 'undefined' && fabOpen) { fabClose(); }
+});
 // swipe down
 ['sheet','infoSheet'].forEach(function(id){
   var el=document.getElementById(id), sy=0;
