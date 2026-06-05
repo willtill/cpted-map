@@ -783,18 +783,23 @@ function updateCompassRose() {
 
 // 네비게이션 모드: 기기 방향에 따라 지도 자동 회전
 document.getElementById('rotBtn').addEventListener('click', function() {
-  if (northLock){ toast('정북 고정 중 — N을 길게 눌러 해제하세요'); return; }
   navMode = !navMode;
   this.classList.toggle('on', navMode);
   if (navMode) {
+    // 네비 ON → 정북 고정 자동 해제(배너 없이) 후 방향 추종 시작
+    northLock = false;
+    if (map.touchRotate && map.touchRotate.enable) map.touchRotate.enable();
+    var nb = document.getElementById('northBtn');   if (nb) nb.classList.remove('locked');
+    var bn = document.getElementById('nlockBanner'); if (bn) bn.classList.remove('on');
     startCompass();  // 나침반 활성화 (iOS 권한 포함)
-    toast('🧭 네비게이션 모드 ON — 보는 방향으로 지도 회전');
+    toast('🧭 네비게이션 ON — 정북 고정 해제, 보는 방향으로 회전');
     _navCur = (map.getBearing ? map.getBearing() : bearing);  // 현재 방위에서 시작
     _navTarget = (deviceHeading != null ? -deviceHeading : _navCur);
     if (!_navRaf) _navRaf = requestAnimationFrame(navTick);
   } else {
-    toast('🧭 네비게이션 모드 OFF');
-    setBearing(0);  // 정북 복귀
+    // 네비 OFF → 정북 고정 자동 재설정(조용히 — 정북 스냅 + 회전 잠금)
+    setNorthLock(true, true);
+    toast('🧭 네비게이션 OFF — 정북 고정');
   }
 });
 // 방위표 클릭 → 정북 복귀 + 네비 모드 해제
@@ -881,13 +886,16 @@ function setLoc(lat, lng, acc) {
 
 // ── 기기 나침반 방향 (구글맵 방향 콘) ──
 var deviceHeading = null, compassStarted = false;
+var _coneAngle = 0;
 function updateLocCone(h) {
   var cone = document.getElementById('locCone');
-  if (cone) {
-    cone.style.display = 'block';
-    var b = (map.getBearing ? map.getBearing() : bearing);
-    cone.style.transform = 'rotate(' + (h + b) + 'deg)';
-  }
+  if (!cone) return;
+  cone.style.display = 'block';
+  var b = (map.getBearing ? map.getBearing() : bearing);
+  var target = h + b;
+  // 최단 경로 누적각 → 0/360 경계에서 CSS 트랜지션이 먼 쪽으로 도는 역회전 방지(나침반 바늘과 동일 방식)
+  _coneAngle += ((((target - _coneAngle) % 360) + 540) % 360) - 180;
+  cone.style.transform = 'rotate(' + _coneAngle + 'deg)';
 }
 // 원형(circular) 이동평균으로 나침반 노이즈 평활화
 var _headBuf = [];
@@ -3430,7 +3438,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.3 · 2026-06-05 · 부산데이터+회전';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.5 · 2026-06-05 · 네비-정북연동';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
   requestAnimationFrame(function(){
