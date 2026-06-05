@@ -625,7 +625,7 @@ function idbClear(store) {
 
 // ══ MAP INIT ══
 var map = L.map('map', {
-  center: [35.91626, 128.28699],  // 최근 사례지(성주읍)로 바로 시작 → 점프·타일 재로딩 방지
+  center: [35.09248, 128.98057],  // 최근 사례지(부산 사하구 신평동)로 바로 시작 → 점프·타일 재로딩 방지
   zoom: 16,
   zoomSnap: 0.25,           // 분수 줌 허용(0.25 단위) — 미세 조정
   zoomDelta: 0.5,           // +/- 버튼·더블탭 한 번에 0.5단계
@@ -789,7 +789,8 @@ document.getElementById('rotBtn').addEventListener('click', function() {
   if (navMode) {
     startCompass();  // 나침반 활성화 (iOS 권한 포함)
     toast('🧭 네비게이션 모드 ON — 보는 방향으로 지도 회전');
-    if (deviceHeading != null) setBearing(-deviceHeading);
+    _navTarget = (deviceHeading != null ? -deviceHeading : (map.getBearing ? map.getBearing() : 0));
+    if (!_navRaf) _navRaf = requestAnimationFrame(navTick);
   } else {
     toast('🧭 네비게이션 모드 OFF');
     setBearing(0);  // 정북 복귀
@@ -896,6 +897,16 @@ function smoothHeading(h) {
   _headBuf.forEach(function(a){ sx += Math.cos(a*Math.PI/180); sy += Math.sin(a*Math.PI/180); });
   return (((Math.atan2(sy, sx)*180/Math.PI) % 360) + 360) % 360;
 }
+// 네비 모드 부드러운 회전: 매 프레임 최단 경로로 목표 방위에 보간 추종 (0/360 경계 끊김·역회전 방지)
+var _navTarget = null, _navRaf = null;
+function navTick(){
+  _navRaf = null;
+  if (!navMode || northLock || _navTarget == null) return;
+  var cur = (map.getBearing ? map.getBearing() : bearing);
+  var d = ((_navTarget - cur + 540) % 360) - 180;          // -180~180 최단 경로
+  setBearing(cur + (Math.abs(d) > 0.4 ? d * 0.2 : d));     // 20%씩 추종(가까우면 스냅)
+  _navRaf = requestAnimationFrame(navTick);                // 멈출 때까지 계속 추종
+}
 function startCompass() {
   if (compassStarted) return;
   var _lastNavRot = 0, _lastApplied = -999;
@@ -916,12 +927,8 @@ function startCompass() {
     var sh = smoothHeading(h);
     deviceHeading = sh;
     if (navMode && !northLock) {
-      var now = Date.now();
-      // 변화량 5° 이상 + 250ms 간격일 때만 회전 (떨림 방지)
-      var diff = Math.abs(((sh - _lastApplied + 540) % 360) - 180);
-      if (now - _lastNavRot > 250 && diff > 5) {
-        _lastNavRot = now; _lastApplied = sh; setBearing(-sh);
-      }
+      _navTarget = -sh;                                       // 추종 목표만 갱신 (실제 회전은 navTick)
+      if (!_navRaf) _navRaf = requestAnimationFrame(navTick);
     } else {
       updateLocCone(sh);
     }
@@ -1072,6 +1079,11 @@ function updateNavi(){} function stopNavi(){}
 // ══ LAYERS ══
 // 지역(분석 대상지) 정의 — 향후 확장 가능
 // center: 지역 그룹 클릭 시 지도 이동 좌표 (옵션)
+// ── 부산 사하구 신평동 (EPSG:5186 → WGS84 변환)
+var VACANT_BS = [{"id": 1, "addr": "다대로135번길 80-12", "type": "단독주택", "grade": "확인불가", "note": "허가", "lat": 35.092904, "lng": 128.98106}, {"id": 2, "addr": "다대로135번길 80-13", "type": "단독주택", "grade": "확인불가", "note": "무허가", "lat": 35.092818, "lng": 128.981144}, {"id": 3, "addr": "다대로135번길 80-15", "type": "단독주택", "grade": "2등급", "note": "허가", "lat": 35.092932, "lng": 128.981154}, {"id": 4, "addr": "다대로135번길 80-16", "type": "단독주택", "grade": "확인불가", "note": "무허가", "lat": 35.092859, "lng": 128.981213}, {"id": 5, "addr": "다대로135번길 80-20", "type": "단독주택", "grade": "2등급", "note": "무허가", "lat": 35.092922, "lng": 128.981272}, {"id": 6, "addr": "다대로135번길 80-22", "type": "단독주택", "grade": "확인불가", "note": "무허가", "lat": 35.092987, "lng": 128.98136}, {"id": 7, "addr": "다대로83번안길 35-7", "type": "단독주택", "grade": "확인불가", "note": "무허가", "lat": 35.092933, "lng": 128.982174}, {"id": 8, "addr": "다대로83번안길 35-9", "type": "단독주택", "grade": "확인불가", "note": "무허가", "lat": 35.0928, "lng": 128.982075}, {"id": 9, "addr": "다대로83번안길 41", "type": "단독주택", "grade": "확인불가", "note": "무허가", "lat": 35.093235, "lng": 128.981525}, {"id": 10, "addr": "다대로83번안길 43", "type": "단독주택", "grade": "확인불가", "note": "무허가", "lat": 35.09325, "lng": 128.98145}, {"id": 11, "addr": "다대로83번안길 51-2", "type": "단독주택", "grade": "확인불가", "note": "무허가", "lat": 35.093141, "lng": 128.981219}, {"id": 13, "addr": "다대로83번안길37-3", "type": "단독주택", "grade": "확인불가", "note": "무허가", "lat": 35.092879, "lng": 128.981893}, {"id": 14, "addr": "다대로83번안길43-7", "type": "단독주택", "grade": "확인불가", "note": "무허가", "lat": 35.092785, "lng": 128.981571}, {"id": 15, "addr": "다대로135번길 34-8", "type": "단독주택", "grade": "확인불가", "note": "무허가", "lat": 35.091508, "lng": 128.979912}, {"id": 16, "addr": "다대로83번안길 35-6", "type": "단독주택", "grade": "확인불가", "note": "무허가", "lat": 35.092969, "lng": 128.982261}, {"id": 17, "addr": "다대로135번길 80-7", "type": "단독주택", "grade": "확인불가", "note": "무허가", "lat": 35.092704, "lng": 128.981098}];
+var LIGHTS_BS = [{"addr": "다대로83번길 111", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093667, "lng": 128.98304}, {"addr": "다대로83번길 111", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093667, "lng": 128.98304}, {"addr": "다대로83번길 111", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093667, "lng": 128.98304}, {"addr": "다대로83번길 111", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093667, "lng": 128.98304}, {"addr": "다대로83번길 92-5", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.09331, "lng": 128.982433}, {"addr": "다대로83번길 92-5", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.09331, "lng": 128.982433}, {"addr": "다대로83번길 92-3", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093345, "lng": 128.982698}, {"addr": "다대로83번길 92-5", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.09331, "lng": 128.982433}, {"addr": "다대로83번길 65", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.094203, "lng": 128.980833}, {"addr": "다대로83번안길 11", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093764, "lng": 128.980926}, {"addr": "다대로83번안길 11", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093764, "lng": 128.980926}, {"addr": "다대로83번안길 15", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093695, "lng": 128.981234}, {"addr": "다대로83번안길 21", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093653, "lng": 128.981364}, {"addr": "다대로83번안길 24", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093486, "lng": 128.981609}, {"addr": "다대로83번안길 24", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093486, "lng": 128.981609}, {"addr": "다대로83번안길 31", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.09346, "lng": 128.981895}, {"addr": "다대로83번안길 33", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093345, "lng": 128.982107}, {"addr": "다대로83번길 92-5", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.09331, "lng": 128.982433}, {"addr": "다대로83번길 92-3", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093345, "lng": 128.982698}, {"addr": "다대로83번길 92-5", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.09331, "lng": 128.982433}, {"addr": "다대로83번길 92-3", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093345, "lng": 128.982698}, {"addr": "다대로83번길 92-3", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093345, "lng": 128.982698}, {"addr": "다대로83번길 92-3", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093345, "lng": 128.982698}, {"addr": "다대로83번안길 38", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093331, "lng": 128.98182}, {"addr": "다대로83번안길 35-2", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093181, "lng": 128.982137}, {"addr": "다대로83번안길 37-3", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092879, "lng": 128.981893}, {"addr": "다대로83번안길 37-3", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092879, "lng": 128.981893}, {"addr": "다대로83번안길 43-1", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093027, "lng": 128.981628}, {"addr": "다대로83번안길 43-1", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093027, "lng": 128.981628}, {"addr": "다대로83번안길 51-3", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093111, "lng": 128.981338}, {"addr": "다대로83번안길 43", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.09325, "lng": 128.98145}, {"addr": "다대로83번안길 63", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093096, "lng": 128.980549}, {"addr": "다대로83번안길 63", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093096, "lng": 128.980549}, {"addr": "다대로83번안길 63", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093096, "lng": 128.980549}, {"addr": "다대로83번안길 63", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093096, "lng": 128.980549}, {"addr": "다대로135번길 78", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092697, "lng": 128.980687}, {"addr": "다대로83번안길 63", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.093096, "lng": 128.980549}, {"addr": "다대로135번길 78", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092697, "lng": 128.980687}, {"addr": "다대로135번길 80-10", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092853, "lng": 128.980968}, {"addr": "다대로135번길 78", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092697, "lng": 128.980687}, {"addr": "다대로135번길 74", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092627, "lng": 128.980839}, {"addr": "다대로83번안길 37-3 ", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092879, "lng": 128.981893}, {"addr": "다대로83번안길 37-3 ", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092879, "lng": 128.981893}, {"addr": "다대로83번안길 37-3 ", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092879, "lng": 128.981893}, {"addr": "다대로83번안길 37-3 ", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092879, "lng": 128.981893}, {"addr": "다대로135번길 45-3", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092183, "lng": 128.979819}, {"addr": "다대로135번길 59-2", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092359, "lng": 128.980328}, {"addr": "다대로135번길 56", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092038, "lng": 128.980215}, {"addr": "다대로135번길 56", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092038, "lng": 128.980215}, {"addr": "다대로135번길 45-3", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.092183, "lng": 128.979819}, {"addr": "다대로135번길 47", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.091956, "lng": 128.979674}, {"addr": "다대로135번길 39", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.091687, "lng": 128.979468}, {"addr": "다대로135번길 36-9", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.091669, "lng": 128.980018}, {"addr": "다대로135번길 34-10", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.091747, "lng": 128.980732}, {"addr": "다대로135번길 34-7", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.091427, "lng": 128.980249}, {"addr": "다대로135번길 34-3", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.091285, "lng": 128.979819}, {"addr": "다대로135번길 30-8", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.090935, "lng": 128.979543}, {"addr": "다대로135번길 30-4", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.091028, "lng": 128.979416}, {"addr": "다대로135번길 36", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.091466, "lng": 128.979492}, {"addr": "다대로135번길 32", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.091306, "lng": 128.979358}, {"addr": "다대로135번길 31", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.091392, "lng": 128.979109}, {"addr": "다대로135번길 31-7", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.091667, "lng": 128.978665}, {"addr": "다대로119번길 11-2", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.091759, "lng": 128.978565}, {"addr": "다대로119번길 5-1", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.091844, "lng": 128.978338}, {"addr": "다대로135번길 36", "count": "1등주", "time": "19:00~06:00", "mgr": "사하구 도시디자인과", "type": "보안등", "lat": 35.091466, "lng": 128.979492}];
+var CCTV_BS   = [{"id": 1, "addr": "다대로83번안길 63", "cam": "2.0", "rot": "회전1,고정1", "purpose": "방범용", "mgr": "사하구 재난대응과", "lat": 35.093096, "lng": 128.980549}, {"id": 2, "addr": "다대로83번안길 43", "cam": "1.0", "rot": "회전", "purpose": "방범용", "mgr": "부산시 자연재난과", "lat": 35.09325, "lng": 128.98145}, {"id": 3, "addr": "다대로135번길 39", "cam": "4.0", "rot": "회전1,고정3", "purpose": "방범용", "mgr": "사하구 재난대응과", "lat": 35.091687, "lng": 128.979468}, {"id": 4, "addr": "다대로135번길 68", "cam": "1.0", "rot": "회전", "purpose": "방범용", "mgr": "사하구 재난대응과", "lat": 35.092337, "lng": 128.98072}];
+var BOUNDARY_BS = [[35.092979, 128.980177], [35.093038, 128.98017], [35.093068, 128.980261], [35.093108, 128.980359], [35.093159, 128.980509], [35.09321, 128.980605], [35.093262, 128.980696], [35.093273, 128.980722], [35.093278, 128.980755], [35.093267, 128.981007], [35.093309, 128.981008], [35.093364, 128.98101], [35.093465, 128.981008], [35.093569, 128.980961], [35.093599, 128.980947], [35.093629, 128.980933], [35.093712, 128.980896], [35.093811, 128.980852], [35.093842, 128.980861], [35.09383, 128.98094], [35.093798, 128.981057], [35.09375, 128.981326], [35.093709, 128.981566], [35.093704, 128.981644], [35.093682, 128.981787], [35.093671, 128.981987], [35.093662, 128.982083], [35.093666, 128.982201], [35.093628, 128.982471], [35.093573, 128.982792], [35.093564, 128.982796], [35.093513, 128.982821], [35.093291, 128.982977], [35.093116, 128.983103], [35.093069, 128.983102], [35.092998, 128.982858], [35.093055, 128.98265], [35.092967, 128.98257], [35.093008, 128.982412], [35.092597, 128.982141], [35.092505, 128.981708], [35.092766, 128.981637], [35.092757, 128.981588], [35.092768, 128.981376], [35.092769, 128.98135], [35.092769, 128.981284], [35.092761, 128.981199], [35.092742, 128.981137], [35.092647, 128.981006], [35.092597, 128.981032], [35.092518, 128.980995], [35.092378, 128.981063], [35.092409, 128.981272], [35.091915, 128.981286], [35.091816, 128.981391], [35.091545, 128.981287], [35.091551, 128.981175], [35.091412, 128.981144], [35.091426, 128.981003], [35.091442, 128.980822], [35.09146, 128.98069], [35.091481, 128.980504], [35.091486, 128.980418], [35.091458, 128.980364], [35.091358, 128.980158], [35.091346, 128.980153], [35.09131, 128.979974], [35.091319, 128.979956], [35.091188, 128.979836], [35.091171, 128.979798], [35.091146, 128.979713], [35.091078, 128.979645], [35.091017, 128.979594], [35.09117, 128.979477], [35.091232, 128.97937], [35.091282, 128.979286], [35.091311, 128.979277], [35.091321, 128.979286], [35.091355, 128.979235], [35.091498, 128.979008], [35.091674, 128.978722], [35.091747, 128.978602], [35.091793, 128.978634], [35.091776, 128.978723], [35.091768, 128.978763], [35.091764, 128.978784], [35.091729, 128.978869], [35.091711, 128.978909], [35.091707, 128.978969], [35.091693, 128.979124], [35.091698, 128.979207], [35.091717, 128.979249], [35.091716, 128.979272], [35.091718, 128.979285], [35.091739, 128.979424], [35.091771, 128.979504], [35.091835, 128.979437], [35.091947, 128.979586], [35.091988, 128.979552], [35.092056, 128.979719], [35.09211, 128.979677], [35.092347, 128.97995], [35.092407, 128.980018], [35.092435, 128.980051], [35.092473, 128.980112], [35.092496, 128.980194], [35.092498, 128.980245], [35.09249, 128.980288], [35.092493, 128.980302], [35.0925, 128.980359], [35.092535, 128.980418], [35.09255, 128.980452], [35.092574, 128.980504], [35.09279, 128.980485], [35.092909, 128.980475], [35.092916, 128.980468], [35.092944, 128.980442], [35.092953, 128.980429], [35.092968, 128.98041], [35.092982, 128.980382], [35.092991, 128.980317], [35.092988, 128.980257], [35.092977, 128.980198], [35.092979, 128.980177]];
 var REGIONS = [
   { id:'pohang-nam', name:'포항 남구 (청림동)', expanded:true,
     layers:['vacant','light','cctv','boundary'],
@@ -1081,7 +1093,10 @@ var REGIONS = [
     center:[35.45338, 128.79722], zoom:15 },
   { id:'seongju-sj', name:'성주군 성주읍', expanded:false,
     layers:['vacant_sj','cctv_sj','bell_sj','boundary_sj'],
-    center:[35.91626, 128.28699], zoom:16 }
+    center:[35.91626, 128.28699], zoom:16 },
+  { id:'busan-saha', name:'부산 사하구 신평동', expanded:false,
+    layers:['vacant_bs','light_bs','cctv_bs','boundary_bs'],
+    center:[35.09248, 128.98057], zoom:16 }
 ];
 
 // 주제별 그룹 (지리 영역이 아님 — center 없음)
@@ -1112,6 +1127,11 @@ var LAYERS = {
   vacant_sj:   {id:'vacant_sj',   name:'빈집',          color:'#f97316',icon:'🏚',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'seongju-sj'},
   cctv_sj:     {id:'cctv_sj',     name:'CCTV',          color:'#3b82f6',icon:'📹',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'seongju-sj'},
   bell_sj:     {id:'bell_sj',     name:'비상벨',        color:'#ef4444',icon:'🔔',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'seongju-sj'},
+  // ── 부산 사하구 신평동
+  boundary_bs: {id:'boundary_bs', name:'신평동 경계',    color:'#6366f1',icon:'🗂',visible:true,opacity:.25,sz:1,weight:3.0,leaf:null,mkrs:[],cnt:0, region:'busan-saha'},
+  vacant_bs:   {id:'vacant_bs',   name:'빈집',           color:'#f97316',icon:'🏚',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'busan-saha'},
+  light_bs:    {id:'light_bs',    name:'가로등/보안등',  color:'#f59e0b',icon:'💡',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'busan-saha'},
+  cctv_bs:     {id:'cctv_bs',     name:'CCTV',           color:'#3b82f6',icon:'📹',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'busan-saha'},
 };
 // 점 마커들이 위에 보이도록 safemap을 boundary 바로 앞(아래 레이어)에 배치
 var L_ORDER = ['survey','photo','cctv','light','vacant','boundary','safemap'];
@@ -1119,7 +1139,7 @@ var L_BASE  = {vacant:20, light:20, cctv:20, photo:42, survey:32, boundary:0};
 
 function applyVis(id) {
   var ly = LAYERS[id];
-  if (id==='boundary'||id==='boundary_smj'||id==='boundary_sj') { drawBoundaries(); return; }
+  if (id==='boundary'||id==='boundary_smj'||id==='boundary_sj'||id==='boundary_bs') { drawBoundaries(); return; }
   if (ly.wmsId && ly.wms) { ly.visible ? map.addLayer(ly.wms) : map.removeLayer(ly.wms); return; }
   ly.mkrs.forEach(function(m){ ly.visible ? map.addLayer(m) : map.removeLayer(m); });
 }
@@ -1348,11 +1368,13 @@ function bndRings(){
   } catch(_) { LAYERS.boundary.rings = []; }
   LAYERS.boundary_smj.rings = (typeof BOUNDARY_SMJ!=='undefined' && BOUNDARY_SMJ.length) ? [BOUNDARY_SMJ] : [];
   LAYERS.boundary_sj.rings  = (typeof BOUNDARY_SJ!=='undefined'  && BOUNDARY_SJ.length)  ? [BOUNDARY_SJ]  : [];
+  LAYERS.boundary_bs.rings  = (typeof BOUNDARY_BS!=='undefined'  && BOUNDARY_BS.length)  ? [BOUNDARY_BS]  : [];
   LAYERS.boundary.cnt = LAYERS.boundary.rings.length ? 1 : 0;
   LAYERS.boundary_smj.cnt = LAYERS.boundary_smj.rings.length ? 1 : 0;
   LAYERS.boundary_sj.cnt = LAYERS.boundary_sj.rings.length ? 1 : 0;
+  LAYERS.boundary_bs.cnt = LAYERS.boundary_bs.rings.length ? 1 : 0;
   // 간소화(약 3m) + 경계별 bbox 계산(화면 밖 컬링용)
-  ['boundary','boundary_smj','boundary_sj'].forEach(function(id){
+  ['boundary','boundary_smj','boundary_sj','boundary_bs'].forEach(function(id){
     var ly = LAYERS[id];
     if (!ly.rings || !ly.rings.length) { ly._bbox = null; return; }
     ly.rings = ly.rings.map(function(r){ return simplifyRing(r, 0.00003); });
@@ -1381,7 +1403,7 @@ function initBoundary(){
   bndSvg.style.cssText = 'position:absolute;top:0;left:0;overflow:visible;';
   bndPaneEl.appendChild(bndSvg);
   // 경로 요소를 미리 만들어 재사용 (매번 DOM 재생성하지 않음 → 빠름)
-  ['boundary','boundary_smj','boundary_sj'].forEach(function(id){
+  ['boundary','boundary_smj','boundary_sj','boundary_bs'].forEach(function(id){
     var p = document.createElementNS(NS,'path');
     p.setAttribute('stroke-dasharray','6 4');
     p.setAttribute('stroke-linejoin','round');
@@ -1400,7 +1422,7 @@ function drawBoundaries(){
   if (!bndSvg) return;
   var view = null;
   try { view = map.getBounds().pad(0.3); } catch(_){}   // 회전 포함 현재 화면 범위(여유 30%)
-  ['boundary','boundary_smj','boundary_sj'].forEach(function(id){
+  ['boundary','boundary_smj','boundary_sj','boundary_bs'].forEach(function(id){
     var ly = LAYERS[id], path = _bndPaths[id];
     if (!path) return;
     if (!ly || !ly.visible || !ly.rings || !ly.rings.length) { path.setAttribute('d',''); return; }
@@ -1507,6 +1529,58 @@ function initCctvSMJ(){
       naviBtn(item.lat,item.lng,item.addr)
     );});
     addMkr('cctv_smj',m);
+  });
+}
+
+// ── 부산 사하구 신평동 초기화
+function initVacantBS(){
+  VACANT_BS.forEach(function(h){
+    var m=L.marker([h.lat,h.lng],{icon:L.divIcon({html:'<div class="vh-pin">'+vhSvg(20)+'</div>',className:'',iconSize:[20,20],iconAnchor:[10,20]})}).addTo(map);
+    m.on('click',function(){openInfo('🏚 빈집 '+h.id,
+      '<div class="ic-ico" style="background:linear-gradient(135deg,#431407,#7c2d12)">🏚</div>'+
+      '<div class="ic-name">빈집 '+h.id+'번 — '+h.addr+'</div>'+
+      '<div class="ic-row"><div class="ic-k">지역</div><div class="ic-v">부산 사하구 신평동</div></div>'+
+      '<div class="ic-row"><div class="ic-k">유형</div><div class="ic-v">'+(h.type||'-')+'</div></div>'+
+      '<div class="ic-row"><div class="ic-k">위험등급</div><div class="ic-v">'+(h.grade||'-')+'</div></div>'+
+      '<div class="ic-row"><div class="ic-k">비고</div><div class="ic-v">'+(h.note||'-')+'</div></div>'+
+      '<div class="ic-coords"><div>위도 <span>'+h.lat.toFixed(6)+'</span></div><div>경도 <span>'+h.lng.toFixed(6)+'</span></div></div>'+
+      naviBtn(h.lat,h.lng,'빈집 '+h.id+'번')
+    );});
+    addMkr('vacant_bs',m);
+  });
+}
+function initLightsBS(){
+  LIGHTS_BS.forEach(function(item){
+    var m=L.marker([item.lat,item.lng],{icon:ciIcon('#f59e0b','💡',20)}).addTo(map);
+    m.on('click',function(){openInfo('💡 '+item.addr,
+      '<div class="ic-ico" style="background:linear-gradient(135deg,#451a03,#78350f)">💡</div>'+
+      '<div class="ic-name">'+item.addr+'</div>'+
+      '<div class="ic-row"><div class="ic-k">지역</div><div class="ic-v">부산 사하구 신평동</div></div>'+
+      '<div class="ic-row"><div class="ic-k">종류</div><div class="ic-v">'+(item.type||'-')+'</div></div>'+
+      '<div class="ic-row"><div class="ic-k">등 수</div><div class="ic-v">'+(item.count||'-')+'</div></div>'+
+      '<div class="ic-row"><div class="ic-k">운영시간</div><div class="ic-v">'+(item.time||'-')+'</div></div>'+
+      '<div class="ic-row"><div class="ic-k">관리</div><div class="ic-v">'+(item.mgr||'-')+'</div></div>'+
+      '<div class="ic-coords"><div>위도 <span>'+item.lat.toFixed(6)+'</span></div><div>경도 <span>'+item.lng.toFixed(6)+'</span></div></div>'+
+      naviBtn(item.lat,item.lng,item.addr)
+    );});
+    addMkr('light_bs',m);
+  });
+}
+function initCctvBS(){
+  CCTV_BS.forEach(function(item){
+    var m=L.marker([item.lat,item.lng],{icon:ciIcon('#3b82f6','📹',20)}).addTo(map);
+    m.on('click',function(){openInfo('📹 '+item.addr,
+      '<div class="ic-ico" style="background:linear-gradient(135deg,#172554,#1e3a8a)">📹</div>'+
+      '<div class="ic-name">'+item.addr+'</div>'+
+      '<div class="ic-row"><div class="ic-k">지역</div><div class="ic-v">부산 사하구 신평동</div></div>'+
+      '<div class="ic-row"><div class="ic-k">카메라</div><div class="ic-v">'+(item.cam||'-')+'대</div></div>'+
+      '<div class="ic-row"><div class="ic-k">회전/고정</div><div class="ic-v">'+(item.rot||'-')+'</div></div>'+
+      '<div class="ic-row"><div class="ic-k">설치목적</div><div class="ic-v">'+(item.purpose||'-')+'</div></div>'+
+      '<div class="ic-row"><div class="ic-k">관리</div><div class="ic-v">'+(item.mgr||'-')+'</div></div>'+
+      '<div class="ic-coords"><div>위도 <span>'+item.lat.toFixed(6)+'</span></div><div>경도 <span>'+item.lng.toFixed(6)+'</span></div></div>'+
+      naviBtn(item.lat,item.lng,item.addr)
+    );});
+    addMkr('cctv_bs',m);
   });
 }
 
@@ -3352,13 +3426,14 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'build 2026-05-21 · 21:00';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.1 · 2026-06-05 · 부산추가';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
   requestAnimationFrame(function(){
     initBoundary(); initVacant(); initLights(); initCctv(); initSafemap();
     initVacantSMJ(); initLightsSMJ(); initCctvSMJ();
     initVacantSJ(); initCctvSJ(); initBellSJ();
+    initVacantBS(); initLightsBS(); initCctvBS();
     Object.keys(LAYERS).forEach(function(id){ applyVis(id); });
     updCounts();
   });
