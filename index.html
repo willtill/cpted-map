@@ -789,7 +789,8 @@ document.getElementById('rotBtn').addEventListener('click', function() {
   if (navMode) {
     startCompass();  // 나침반 활성화 (iOS 권한 포함)
     toast('🧭 네비게이션 모드 ON — 보는 방향으로 지도 회전');
-    _navTarget = (deviceHeading != null ? -deviceHeading : (map.getBearing ? map.getBearing() : 0));
+    _navCur = (map.getBearing ? map.getBearing() : bearing);  // 현재 방위에서 시작
+    _navTarget = (deviceHeading != null ? -deviceHeading : _navCur);
     if (!_navRaf) _navRaf = requestAnimationFrame(navTick);
   } else {
     toast('🧭 네비게이션 모드 OFF');
@@ -898,14 +899,14 @@ function smoothHeading(h) {
   return (((Math.atan2(sy, sx)*180/Math.PI) % 360) + 360) % 360;
 }
 // 네비 모드 부드러운 회전: 매 프레임 최단 경로로 목표 방위에 보간 추종 (0/360 경계 끊김·역회전 방지)
-var _navTarget = null, _navRaf = null;
+var _navTarget = null, _navRaf = null, _navCur = 0;
 function navTick(){
   _navRaf = null;
   if (!navMode || northLock || _navTarget == null) return;
-  var cur = (map.getBearing ? map.getBearing() : bearing);
-  var d = ((((_navTarget - cur) % 360) + 540) % 360) - 180; // 항상 -180~180 최단 경로(JS 음수 % 보정 → 정북 역회전 해결)
-  setBearing(cur + (Math.abs(d) > 0.4 ? d * 0.2 : d));     // 20%씩 추종(가까우면 스냅)
-  _navRaf = requestAnimationFrame(navTick);                // 멈출 때까지 계속 추종
+  var d = ((((_navTarget - _navCur) % 360) + 540) % 360) - 180; // 항상 -180~180 최단 경로(JS 음수 % 보정)
+  _navCur += (Math.abs(d) > 0.4 ? d * 0.2 : d);                 // 내부 누적값으로 추종 → getBearing 의존/정북 역회전 제거
+  setBearing(_navCur);
+  _navRaf = requestAnimationFrame(navTick);                     // 멈출 때까지 계속 추종
 }
 function startCompass() {
   if (compassStarted) return;
@@ -2568,6 +2569,9 @@ function getLayerData(lid) {
     case 'vacant_sj':   return VACANT_SJ;
     case 'cctv_sj':     return CCTV_SJ;
     case 'bell_sj':     return BELL_SJ;
+    case 'vacant_bs':   return VACANT_BS;
+    case 'light_bs':    return LIGHTS_BS;
+    case 'cctv_bs':     return CCTV_BS;
     default:            return [];
   }
 }
@@ -3426,7 +3430,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.2 · 2026-06-05 · 회전수정';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.3 · 2026-06-05 · 부산데이터+회전';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
   requestAnimationFrame(function(){
