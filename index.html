@@ -402,6 +402,9 @@ html,body{width:100%;height:100%;overflow:hidden;
   font-size:9px;line-height:1;color:rgba(255,255,255,.6);background:rgba(15,23,42,.45);
   padding:3px 7px;border-radius:8px;pointer-events:none;letter-spacing:.2px;
   backdrop-filter:blur(3px);font-variant-numeric:tabular-nums;}
+.basemap{filter:saturate(var(--map-sat,1)) brightness(var(--map-bri,1));transition:filter .25s;}
+.msat-preset{flex:1;padding:9px 6px;border-radius:8px;border:1px solid var(--border);background:var(--p2);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;}
+.msat-preset:active{background:var(--accent);color:#fff;}
 </style>
 </head>
 <body>
@@ -726,12 +729,12 @@ async function revGeocode(lat, lng) {
   return null;
 }
 var TILES = {
-  'esri-street': L.tileLayer(ESRI+'/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, keepBuffer:4, updateWhenIdle:false}),
-  'esri-sat':    L.tileLayer(ESRI+'/World_Imagery/MapServer/tile/{z}/{y}/{x}',    {maxZoom:19, keepBuffer:4, updateWhenIdle:false}),
-  'esri-topo':   L.tileLayer(ESRI+'/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',   {maxZoom:19, keepBuffer:4, updateWhenIdle:false})
+  'esri-street': L.tileLayer(ESRI+'/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, keepBuffer:4, updateWhenIdle:false, className:'basemap'}),
+  'esri-sat':    L.tileLayer(ESRI+'/World_Imagery/MapServer/tile/{z}/{y}/{x}',    {maxZoom:19, keepBuffer:4, updateWhenIdle:false, className:'basemap'}),
+  'esri-topo':   L.tileLayer(ESRI+'/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',   {maxZoom:19, keepBuffer:4, updateWhenIdle:false, className:'basemap'})
 };
 var curTile = (_bk
-  ? L.tileLayer('https://api.vworld.kr/req/wmts/1.0.0/'+_bk+'/Base/{z}/{y}/{x}.png',{maxZoom:19,crossOrigin:true,keepBuffer:4,updateWhenIdle:false})
+  ? L.tileLayer('https://api.vworld.kr/req/wmts/1.0.0/'+_bk+'/Base/{z}/{y}/{x}.png',{maxZoom:19,crossOrigin:true,keepBuffer:4,updateWhenIdle:false,className:'basemap'})
   : TILES['esri-street']
 ).addTo(map);
 
@@ -739,7 +742,13 @@ function vwUrl(t, e) {
   var base = PROXY
     ? PROXY + '/wmts/' + t + '/{z}/{y}/{x}.' + (e||'png')
     : 'https://api.vworld.kr/req/wmts/1.0.0/' + vwKey + '/' + t + '/{z}/{y}/{x}.' + (e||'png');
-  return L.tileLayer(base, {maxZoom:19, crossOrigin:true, keepBuffer:4, updateWhenIdle:false});
+  return L.tileLayer(base, {maxZoom:19, crossOrigin:true, keepBuffer:4, updateWhenIdle:false, className:'basemap'});
+}
+// 배경 지도 채도/밝기 필터 — 마커·경계·범죄 오버레이는 영향 없음
+function setMapFilter(sat, bri){
+  document.documentElement.style.setProperty('--map-sat', sat);
+  document.documentElement.style.setProperty('--map-bri', bri);
+  try{ localStorage.setItem('mapfilter', JSON.stringify({s:sat, b:bri})); }catch(_){}
 }
 function setTile(k) {
   if (k === curKey) return;
@@ -2954,6 +2963,36 @@ function openMapSheet(){
     grid.appendChild(b);
   });
   body.appendChild(grid);
+
+  // ── 배경 지도 채도/밝기 조정 ──
+  var cur; try{ cur = JSON.parse(localStorage.getItem('mapfilter')) || {s:1,b:1}; }catch(_){ cur={s:1,b:1}; }
+  var ctrl=document.createElement('div');
+  ctrl.style.cssText='padding:16px;border-top:1px solid var(--border);margin-top:8px;';
+  ctrl.innerHTML=
+    '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">배경 지도 조정 <span style="font-weight:400;text-transform:none;letter-spacing:0">(마커·경계는 그대로)</span></div>'+
+    '<div style="display:flex;gap:6px;margin-bottom:14px">'+
+      '<button class="msat-preset" data-s="1" data-b="1">원본</button>'+
+      '<button class="msat-preset" data-s="0.45" data-b="1.08">연하게</button>'+
+      '<button class="msat-preset" data-s="0" data-b="1.05">흑백</button>'+
+    '</div>'+
+    '<label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:10px;margin-bottom:10px">채도'+
+      '<input type="range" id="satRange" min="0" max="150" step="5" style="flex:1">'+
+      '<span id="satVal" style="font-family:monospace;font-size:11px;width:40px;text-align:right;color:var(--text)"></span></label>'+
+    '<label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:10px">밝기'+
+      '<input type="range" id="briRange" min="70" max="130" step="2" style="flex:1">'+
+      '<span id="briVal" style="font-family:monospace;font-size:11px;width:40px;text-align:right;color:var(--text)"></span></label>';
+  body.appendChild(ctrl);
+
+  var satR=document.getElementById('satRange'), briR=document.getElementById('briRange');
+  var satV=document.getElementById('satVal'), briV=document.getElementById('briVal');
+  satR.value=Math.round(cur.s*100); briR.value=Math.round(cur.b*100);
+  function refl(){ satV.textContent=satR.value+'%'; briV.textContent=briR.value+'%'; }
+  function applyF(){ setMapFilter(satR.value/100, briR.value/100); refl(); }
+  refl();
+  satR.addEventListener('input',applyF); briR.addEventListener('input',applyF);
+  Array.prototype.forEach.call(ctrl.querySelectorAll('.msat-preset'),function(btn){
+    btn.addEventListener('click',function(){ satR.value=Math.round(this.dataset.s*100); briR.value=Math.round(this.dataset.b*100); applyF(); });
+  });
 }
 document.getElementById('mapSwBtn').addEventListener('click', openMapSheet);
 
@@ -3438,8 +3477,9 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.5 · 2026-06-05 · 네비-정북연동';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.6 · 2026-06-05 · 배경채도조정';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
+  try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
   requestAnimationFrame(function(){
     initBoundary(); initVacant(); initLights(); initCctv(); initSafemap();
