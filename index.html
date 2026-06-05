@@ -903,7 +903,7 @@ function navTick(){
   _navRaf = null;
   if (!navMode || northLock || _navTarget == null) return;
   var cur = (map.getBearing ? map.getBearing() : bearing);
-  var d = ((_navTarget - cur + 540) % 360) - 180;          // -180~180 최단 경로
+  var d = ((((_navTarget - cur) % 360) + 540) % 360) - 180; // 항상 -180~180 최단 경로(JS 음수 % 보정 → 정북 역회전 해결)
   setBearing(cur + (Math.abs(d) > 0.4 ? d * 0.2 : d));     // 20%씩 추종(가까우면 스냅)
   _navRaf = requestAnimationFrame(navTick);                // 멈출 때까지 계속 추종
 }
@@ -3426,7 +3426,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.1 · 2026-06-05 · 부산추가';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.2 · 2026-06-05 · 회전수정';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
   requestAnimationFrame(function(){
