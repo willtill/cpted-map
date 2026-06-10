@@ -658,6 +658,7 @@ if (map.on) {
   map.on('rotate', function(){
     updateCompassRose();
     if (deviceHeading != null) updateLocCone(deviceHeading);
+    updatePhotoDirs();
   });
 }
 
@@ -905,6 +906,16 @@ function updateLocCone(h) {
   // 최단 경로 누적각 → 0/360 경계에서 CSS 트랜지션이 먼 쪽으로 도는 역회전 방지(나침반 바늘과 동일 방식)
   _coneAngle += ((((target - _coneAngle) % 360) + 540) % 360) - 180;
   cone.style.transform = 'rotate(' + _coneAngle + 'deg)';
+}
+// 모든 사진 마커의 방향 삼각형을 현재 지도 회전각에 맞춰 갱신 (화면상 각도 = 촬영방위 + bearing)
+function updatePhotoDirs() {
+  var b = (map.getBearing ? map.getBearing() : (typeof bearing !== 'undefined' ? bearing : 0));
+  var els = document.getElementsByClassName('pin-dir');
+  for (var i = 0; i < els.length; i++) {
+    var h = parseFloat(els[i].getAttribute('data-h'));
+    if (isNaN(h)) continue;
+    els[i].style.transform = 'rotate(' + (h + b) + 'deg)';
+  }
 }
 // 원형(circular) 이동평균으로 나침반 노이즈 평활화
 var _headBuf = [];
@@ -1201,7 +1212,7 @@ function setLayerSz(id, v) {
     else if (id==='light')  ico = ciIcon('#f59e0b','💡',sz);
     else if (id==='cctv')   ico = ciIcon('#3b82f6','📹',sz);
     else if (id==='survey') ico = svIcon(m._sv, sz);
-    else if (id==='photo')  ico = L.divIcon({html:'<div class="pin" style="width:'+sz+'px;height:'+sz+'px"><img src="'+(m._pd||'')+'"></div>',className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz]});
+    else if (id==='photo')  ico = pinIcon(m._pd||'', sz, m._heading);
     if (ico) m.setIcon(ico);
   });
   saveLayers();
@@ -1269,10 +1280,21 @@ function svIcon(sv, sz) {
     className:'', iconSize:[sz,sz], iconAnchor:[sz/2,sz]
   });
 }
-function pinIcon(dataUrl, sz) {
+function pinIcon(dataUrl, sz, heading) {
   sz = sz||42;
+  var dir = '';
+  if (heading != null && !isNaN(heading)) {
+    var b = (map.getBearing ? map.getBearing() : 0);
+    var rot = heading + b; // 화면상 각도 = 촬영방위 + 지도 회전각 (locCone과 동일 보정)
+    dir = '<div class="pin-dir" data-h="'+heading+'" style="position:absolute;left:0;top:0;width:'+sz+'px;height:'+sz+'px;transform:rotate('+rot+'deg);transform-origin:50% 50%;pointer-events:none;z-index:2;">'
+        + '<div style="position:absolute;left:50%;top:-9px;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid #d97706;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35)) drop-shadow(0 0 1.5px #fff);"></div>'
+        + '</div>';
+  }
   return L.divIcon({
-    html:'<div class="pin" style="width:'+sz+'px;height:'+sz+'px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #10b981;overflow:hidden;background:#fff;box-shadow:0 3px 10px rgba(16,185,129,.4);"><img src="'+dataUrl+'" style="width:100%;height:100%;object-fit:cover;transform:rotate(45deg) scale(1.5);pointer-events:none;display:block;"></div>',
+    html:'<div class="pin-wrap" style="position:relative;width:'+sz+'px;height:'+sz+'px;">'
+       + dir
+       + '<div class="pin" style="width:'+sz+'px;height:'+sz+'px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #10b981;overflow:hidden;background:#fff;box-shadow:0 3px 10px rgba(16,185,129,.4);"><img src="'+dataUrl+'" style="width:100%;height:100%;object-fit:cover;transform:rotate(45deg) scale(1.5);pointer-events:none;display:block;"></div>'
+       + '</div>',
     className:'', iconSize:[sz,sz], iconAnchor:[sz/2,sz]
   });
 }
@@ -1355,8 +1377,10 @@ document.getElementById('noteOnlyBtn').addEventListener('click', function(){ fab
 document.getElementById('camInput').addEventListener('change', function(e){
   if (!e.target.files || !e.target.files.length) return;
   var file = e.target.files[0]; e.target.value='';
+  // 촬영 순간의 나침반 방위 포착 (앱 카메라 경로 한정 — 갤러리/가져오기에는 적용 안 함)
+  var _ch = (deviceHeading != null && !isNaN(deviceHeading)) ? Math.round(((deviceHeading % 360) + 360) % 360) : null;
   fabClose();
-  setTimeout(function(){ openPhotoMetaSheet(file); }, 300);
+  setTimeout(function(){ openPhotoMetaSheet(file); pmDraft.camHeading = _ch; }, 300);
 });
 document.getElementById('gallInput').addEventListener('change', function(e){
   if (!e.target.files || !e.target.files.length) return;
@@ -1371,6 +1395,11 @@ document.getElementById('gallInput').addEventListener('change', function(e){
     setTimeout(function(){ openPhotoMetaSheet(f, idx < files.length ? nextPhoto : null); }, 300);
   }
   nextPhoto();
+});
+// 사진 버튼 탭(사용자 제스처)에서 나침반 시작 — iOS 권한 확보 + 촬영 전 방위 활성화 보장
+['camInput','gallInput'].forEach(function(id){
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('click', function(){ try { startCompass(); } catch(_){} });
 });
 
 // ══ INIT LAYERS ══
@@ -1750,9 +1779,10 @@ function buildPhotoInfoRows(p) {
 
 function mkPhotoMkr(p) {
   var sz = Math.round(42 * LAYERS.photo.sz);
-  var m = L.marker([p.lat,p.lng], {icon:pinIcon(p.dataUrl,sz)}).addTo(map);
+  var m = L.marker([p.lat,p.lng], {icon:pinIcon(p.dataUrl,sz,p.heading)}).addTo(map);
   m._pd = p.dataUrl;
   m._pid = p.id;
+  m._heading = (p.heading != null ? p.heading : null);
 
   // ── PC 전용: 호버 팝업 (사진 + 전체 정보)
   m.on('mouseover', function() {
@@ -1831,8 +1861,8 @@ async function processPhotos(files) {
   for (var i=0; i<arr.length; i++) {
     pb((i+1)/arr.length);
     var url = await toDataURL(arr[i]);
-    var lat=null,lng=null,dt=null;
-    try { var ex=await (await ensureExifr()).parse(arr[i],{gps:true,ifd0:true}); if(ex&&ex.latitude!=null){lat=ex.latitude;lng=ex.longitude;} if(ex)dt=fmtDate(ex.DateTimeOriginal||ex.DateTime); } catch(_){}
+    var lat=null,lng=null,dt=null,imgDir=null;
+    try { var ex=await (await ensureExifr()).parse(arr[i],{gps:true,ifd0:true}); if(ex&&ex.latitude!=null){lat=ex.latitude;lng=ex.longitude;} if(ex)dt=fmtDate(ex.DateTimeOriginal||ex.DateTime); if(ex&&ex.GPSImgDirection!=null)imgDir=ex.GPSImgDirection; } catch(_){}
     if (!lat && lastPos) { lat=lastPos.lat; lng=lastPos.lng; toast('📍 EXIF GPS 없음 — 현재 위치 사용'); }
     if (!lat) {
       var gpsResult = await new Promise(function(res) {
@@ -1846,7 +1876,7 @@ async function processPhotos(files) {
       if (gpsResult) { lat=gpsResult.lat; lng=gpsResult.lng; toast('📍 현재 위치로 저장됨'); }
       else { toast('⚠️ GPS를 확인할 수 없음 — 위치 없이 저장'); }
     }
-    var p = {id:'p'+Date.now()+'_'+i, name:arr[i].name, dataUrl:url, lat:lat, lng:lng, date:dt, hasGps:true};
+    var p = {id:'p'+Date.now()+'_'+i, name:arr[i].name, dataUrl:url, lat:lat, lng:lng, date:dt, hasGps:true, heading:(imgDir!=null&&!isNaN(imgDir))?Math.round(((imgDir%360)+360)%360):null};
     photos.push(p);
     addMkr('photo', mkPhotoMkr(p));
     await idbPut('photos', p);
@@ -2120,6 +2150,7 @@ async function pmAutoGPS(file) {
   // 1) EXIF GPS 시도
   try {
     var ex = await (await ensureExifr()).parse(file, {gps:true, ifd0:true});
+    if (ex && ex.GPSImgDirection != null && !isNaN(ex.GPSImgDirection)) pmDraft.imgDir = ex.GPSImgDirection; // EXIF 촬영방위(있을 때만 — 아이폰 등)
     if (ex && ex.latitude != null) {
       setGpsTxt('EXIF GPS', ex.latitude, ex.longitude);
       if (ex.DateTimeOriginal || ex.DateTime) {
@@ -2302,6 +2333,9 @@ async function pmSave(onNextCb) {
 
     // ── 3단계: IndexedDB 저장 (먼저 — 이후 단계 실패해도 데이터 보존)
     if (saveBtn) saveBtn.textContent = '저장 중...';
+    // 촬영 방위: EXIF 촬영방위가 있으면 우선, 없으면 촬영 순간 나침반값 (둘 다 없으면 null → 삼각형 미표시)
+    var _hdg = (pmDraft.imgDir != null && !isNaN(pmDraft.imgDir)) ? Math.round(((pmDraft.imgDir % 360) + 360) % 360)
+             : (pmDraft.camHeading != null ? pmDraft.camHeading : null);
     var p = {
       id: 'p' + Date.now(),
       name: title, desc: desc, memo: memo,
@@ -2313,7 +2347,8 @@ async function pmSave(onNextCb) {
       gpsSource: pmDraft.gpsSource,
       address: pmDraft.address || '',
       date: pmDraft.exifDate || today,
-      hasXmp: false
+      hasXmp: false,
+      heading: _hdg
     };
     photos.push(p);
     await idbPut('photos', p);
@@ -2324,7 +2359,7 @@ async function pmSave(onNextCb) {
     // ── 4단계: 폼 닫기 (데이터 안전 보장 후)
     closeAll();
     if (onNextCb) setTimeout(onNextCb, 400);
-    toast('📷 저장됨');
+    toast('📷 저장됨' + (_hdg != null ? ' · 🧭 ' + _hdg + '°' : ' · 방위 없음(나침반 미작동)'));
 
     // ── 5단계: XMP 삽입 + 다운로드 (백그라운드, 원본 화질)
     var isJpeg = pmDraft.file && (pmDraft.file.type==='image/jpeg'||pmDraft.file.type==='image/jpg'||pmDraft.file.name.match(/\.jpe?g$/i));
@@ -3519,7 +3554,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.8 · 2026-06-09 · 강릉복구+정렬';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.9 · 2026-06-10 · 사진 촬영방향+진단';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
