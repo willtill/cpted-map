@@ -1911,6 +1911,7 @@ function buildXMPPacket(meta) {
     '   <dc:subject><rdf:Bag>\n'+tagItems+'\n   </rdf:Bag></dc:subject>\n'+
     '   <xmp:Rating>'+(meta.rating||0)+'</xmp:Rating>\n'+
     '   <xmp:CreateDate>'+now+'</xmp:CreateDate>\n'+
+    ((meta.heading!=null && !isNaN(meta.heading)) ? '   <exif:GPSImgDirection>'+Math.round(((meta.heading%360)+360)%360)+'</exif:GPSImgDirection>\n' : '')+
     '  </rdf:Description>\n'+
     ' </rdf:RDF>\n'+
     '</x:xmpmeta>\n'+
@@ -2246,7 +2247,7 @@ async function extractXMPRaw(file) {
 
 // XMP XML 문자열에서 필드 직접 파싱 (우리가 만든 XMP 구조 기반)
 function parseXMPRaw(xmp) {
-  var r = { title:'', description:'', tags:[], rating:0 };
+  var r = { title:'', description:'', tags:[], rating:0, heading:null };
   if (!xmp) return r;
   function decode(s) {
     return String(s||'').replace(/&amp;/g,'&').replace(/&lt;/g,'<')
@@ -2271,6 +2272,9 @@ function parseXMPRaw(xmp) {
   // xmp:Rating
   var mR = xmp.match(/<xmp:Rating>(\d+)<\/xmp:Rating>/);
   if (mR) r.rating = parseInt(mR[1]);
+  // exif:GPSImgDirection (촬영 방위)
+  var mH = xmp.match(/<exif:GPSImgDirection>([\d.]+)<\/exif:GPSImgDirection>/);
+  if (mH) r.heading = Math.round(((parseFloat(mH[1]) % 360) + 360) % 360);
   return r;
 }
 
@@ -3259,7 +3263,7 @@ async function exportAll(){
         var pts = pd.getFullYear()+pp(pd.getMonth()+1)+pp(pd.getDate())+'_'+pp(pd.getHours())+pp(pd.getMinutes())+pp(pd.getSeconds());
         var blob=dataUrlToBlob(p.originalUrl||p.dataUrl); // 원본 화질 우선
         var xmp=buildXMPPacket({title:p.name,description:p.desc||'',tags:p.tags||[],
-          rating:p.rating||0,location:p.lat?p.lat.toFixed(6)+','+p.lng.toFixed(6):''});
+          rating:p.rating||0,heading:p.heading,location:p.lat?p.lat.toFixed(6)+','+p.lng.toFixed(6):''});
         var annotated;
         try{annotated=await injectXMPIntoJPEG(blob,xmp);}catch(_){annotated=blob;}
         shareFiles.push(new File([annotated], 'CPTED_'+pts+'.jpg',{type:'image/jpeg'}));
@@ -3434,7 +3438,8 @@ async function importFromFiles(files){
           dataUrl:dataUrl, lat:lat, lng:lng,
           gpsSource:lat!=null?(ex.latitude!=null?'EXIF GPS':'XMP 복원'):'위치 없음',
           date:parsed.date||new Date().toLocaleDateString('ko-KR'),
-          hasXmp:!!xmpRaw
+          hasXmp:!!xmpRaw,
+          heading:(xmpFields.heading!=null)?xmpFields.heading:((ex.GPSImgDirection!=null&&!isNaN(ex.GPSImgDirection))?Math.round(((ex.GPSImgDirection%360)+360)%360):null)
         };
 
         // 중복: 파일명(id 포함) 기반으로 완화
@@ -3554,7 +3559,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.9 · 2026-06-10 · 사진 촬영방향+진단';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.9 · 2026-06-10 · 방위 내보내기연동';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
