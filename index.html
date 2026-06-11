@@ -980,6 +980,20 @@ function startCompass() {
     compassStarted = true;
   }
 }
+// 방위를 즉시 잡되, 아직 첫 측정값이 없으면 최대 1.5초까지 기다렸다가 콜백
+function captureHeadingSoon(cb) {
+  try { startCompass(); } catch(_){}
+  function val(){ return (deviceHeading != null && !isNaN(deviceHeading)) ? Math.round(((deviceHeading % 360) + 360) % 360) : null; }
+  var v = val();
+  if (v != null) { cb(v); return; }
+  var tries = 0;
+  var iv = setInterval(function(){
+    tries++;
+    var vv = val();
+    if (vv != null) { clearInterval(iv); cb(vv); }
+    else if (tries >= 15) { clearInterval(iv); cb(null); }
+  }, 100);
+}
 var locRequesting = false;
 
 // 위치 권한 거부 시 기기별 해결 안내
@@ -1370,6 +1384,8 @@ document.getElementById('fabBtn').addEventListener('click', function(){
   document.getElementById('fabMenu').classList.toggle('on', fabOpen);
   this.textContent = fabOpen ? '✕' : '📋';
   this.className = 'fab ' + (fabOpen ? 'fab-red' : 'fab-green');
+  // 메뉴 열 때 나침반 시작 — iOS 방향센서 권한을 카메라 탭과 분리된 제스처에서 요청(카메라 동작 간섭 방지)
+  if (fabOpen) { try { startCompass(); } catch(_){} }
 });
 document.getElementById('noteOnlyBtn').addEventListener('click', function(){ fabClose(); openSurveyForm(null); });
 
@@ -1395,11 +1411,6 @@ document.getElementById('gallInput').addEventListener('change', function(e){
     setTimeout(function(){ openPhotoMetaSheet(f, idx < files.length ? nextPhoto : null); }, 300);
   }
   nextPhoto();
-});
-// 사진 버튼 탭(사용자 제스처)에서 나침반 시작 — iOS 권한 확보 + 촬영 전 방위 활성화 보장
-['camInput','gallInput'].forEach(function(id){
-  var el = document.getElementById(id);
-  if (el) el.addEventListener('click', function(){ try { startCompass(); } catch(_){} });
 });
 
 // ══ INIT LAYERS ══
@@ -3101,7 +3112,7 @@ function openMoreSheet(){
           '<span style="font-size:22px">📂</span>'+
           '<span>파일 선택 또는 드래그앤드롭</span>'+
           '<span style="font-size:10px;color:var(--muted)">.jpg 사진 / .txt 노트 — 복수 가능</span>'+
-          '<input type="file" id="importInp" accept="image/jpeg,.jpg,.jpeg,.txt,text/plain" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;">'+
+          '<input type="file" id="importInp" accept="image/*,.txt,text/plain" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;">'+
         '</div>'+
       '</div>'+
       '<div style="border-top:1px solid var(--border);margin-bottom:4px"></div>'+
@@ -3383,9 +3394,9 @@ function parseSurveyTxt(text){
 
 async function importFromFiles(files){
   var arr=Array.from(files).filter(function(f){
-    return f.type.startsWith('image/')||f.name.match(/\.jpe?g$/i)||f.name.match(/\.txt$/i);
+    return f.type.startsWith('image/')||f.name.match(/\.(jpe?g|png|webp|heic|heif|gif|bmp)$/i)||f.name.match(/\.txt$/i);
   });
-  if(!arr.length){ toast('⚠️ JPG 또는 TXT 파일을 선택하세요'); return; }
+  if(!arr.length){ toast('⚠️ 이미지 또는 TXT 파일을 선택하세요'); return; }
   toast('📥 불러오는 중... ('+arr.length+'개)');
   pb(0.05);
   var cnt={p:0,s:0,skip:0,e:0};
@@ -3559,7 +3570,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.9 · 2026-06-10 · 방위 내보내기연동';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.9 · 2026-06-10 · iOS카메라수정';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
