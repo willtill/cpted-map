@@ -162,7 +162,7 @@ html,body{width:100%;height:100%;overflow:hidden;
   background:var(--panel);border-radius:20px 20px 0 0;
   transform:translateY(100%);
   transition:transform .3s cubic-bezier(.32,1,.6,1);
-  max-height:88vh;display:flex;flex-direction:column;
+  max-height:92vh;display:flex;flex-direction:column;
   padding-bottom:var(--safe-b);
 }
 .sheet.on{transform:translateY(0);}
@@ -1471,7 +1471,7 @@ var REGIONS = [
   { id:'gangneung', name:'[경찰청]강원 강릉시', expanded:false,
     layers:['light_gn','cctv_gn','boundary_gn'],
     center:[37.73555, 128.87643], zoom:15 },
-  { id:'pohang-nam', name:'포항 남구 (청림동)', expanded:true,
+  { id:'pohang-nam', name:'포항 남구 (청림동)', expanded:false,
     layers:['vacant','light','cctv','boundary'],
     center:[35.9952, 129.4163], zoom:16 },
   { id:'miryang-smj', name:'밀양시 삼랑진읍', expanded:false,
@@ -3084,7 +3084,6 @@ function openSurveyList(){
   openSheet('📋 현장 기록 ('+total+')', '<div id="slRoot"></div>');
   var body = document.getElementById('shBody'); if(body) body.onclick=_slClick;
   _expSel={}; _expOpen={}; _expGroupsBuild();
-  _expGroups.forEach(function(g){_expOpen[g.id]=true;});
   _renderSurveyList();
 }
 function _slTitleSync(){ var el=document.getElementById('shTitle'); if(el) el.textContent='📋 현장 기록 ('+(photos.length+surveys.length)+')'; }
@@ -3375,7 +3374,7 @@ function buildDataSheet() {
     if (flyBtn) flyBtn.addEventListener('click', function(e){
       e.stopPropagation();
       if (rg.center) {
-        map.flyTo(rg.center, rg.zoom||15, {duration:1.2});
+        gotoRegion(rg);
         closeAll();
         toast('📍 '+rg.name+'로 이동');
       }
@@ -3610,6 +3609,20 @@ function appendLayerRow(parent, lid){
   parent.appendChild(list);
 }
 
+// 지역 바로가기: 해당 지역 경계선이 화면에 다 들어오도록 이동 (경계 없으면 center로 폴백)
+function gotoRegion(rg){
+  var pts=[];
+  if (rg && rg.layers){
+    for (var gi=0; gi<rg.layers.length; gi++){
+      var lid=rg.layers[gi];
+      if (lid.indexOf('boundary')===0 && LAYERS[lid] && LAYERS[lid].rings){
+        LAYERS[lid].rings.forEach(function(ring){ for(var j=0;j<ring.length;j++) pts.push(ring[j]); }); // [위도,경도]
+      }
+    }
+  }
+  if (pts.length>=2){ try{ map.fitBounds(L.latLngBounds(pts), {padding:[40,80], maxZoom:18}); return; }catch(_){} }
+  if (rg && rg.center) map.flyTo(rg.center, rg.zoom||15, {duration:1.2}); // 폴백
+}
 function buildLP(){
   var body = document.getElementById('shBody');
   if(!body) return;
@@ -3659,7 +3672,7 @@ function buildLP(){
     if (flyBtn) flyBtn.addEventListener('click', function(e){
       e.stopPropagation();
       if (rg.center && rg.center.length === 2) {
-        map.flyTo(rg.center, rg.zoom || 15, {duration: 1.2});
+        gotoRegion(rg);
         closeAll();
         toast('📍 ' + rg.name + '로 이동');
       }
@@ -3709,7 +3722,7 @@ function openMapSheet(){
   // ── 배경 지도 채도/밝기 조정 ──
   var cur; try{ cur = JSON.parse(localStorage.getItem('mapfilter')) || {s:1,b:1}; }catch(_){ cur={s:1,b:1}; }
   var ctrl=document.createElement('div');
-  ctrl.style.cssText='padding:16px;border-top:1px solid var(--border);margin-top:8px;';
+  ctrl.style.cssText='padding:12px 16px;border-top:1px solid var(--border);margin-top:6px;';
   ctrl.innerHTML=
     '<div style="font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--accent);margin-bottom:10px">배경 지도 조정 <span style="font-weight:400;letter-spacing:0;color:var(--muted)">(마커·경계는 그대로)</span></div>'+
     '<div style="display:flex;gap:6px;margin-bottom:14px">'+
@@ -3748,29 +3761,29 @@ function openMoreSheet(){
   var body=document.getElementById('shBody');
   var total = photos.length + surveys.length;
   body.innerHTML=
-    '<div style="padding:14px 16px 4px">'+
+    '<div style="padding:10px 14px 4px">'+
       '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">내보내기 / 불러오기</div>'+
-      '<div style="background:var(--p2);border-radius:12px;padding:14px;margin-bottom:10px">'+
+      '<div style="background:var(--p2);border-radius:12px;padding:11px;margin-bottom:8px">'+
         '<div style="font-size:14px;font-weight:600;margin-bottom:4px">'+svgIc('export','width:15px;height:15px;color:var(--accent);vertical-align:-2px;margin-right:5px')+'내보내기(.ZIP)</div>'+
         '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">사진 <b style="color:var(--green)">'+photos.length+'</b>개 + 노트 <b style="color:var(--purple)">'+surveys.length+'</b>건 · 지역별로 선택해 사진·노트·목록(CSV)을 ZIP으로 압축</div>'+
         '<button class="sf-save" id="exportBtn"'+(total?'':' disabled style="opacity:.4"')+'>'+svgIc('export','width:16px;height:16px;color:#fff;vertical-align:-3px;margin-right:6px')+'내보내기(.ZIP)</button>'+
       '</div>'+
-      '<div style="background:var(--p2);border-radius:12px;padding:14px;margin-bottom:14px">'+
+      '<div style="background:var(--p2);border-radius:12px;padding:11px;margin-bottom:8px">'+
         '<div style="font-size:14px;font-weight:600;margin-bottom:4px">'+svgIc('import','width:15px;height:15px;color:var(--accent);vertical-align:-2px;margin-right:5px')+'사진·노트 불러오기</div>'+
         '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">갤러리 사진(JPEG) 또는 내보낸 파일(JPEG·TXT) 선택·드래그 — EXIF 위치로 자동 배치, 분류는 나중 편집</div>'+
-        '<div id="importZone" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;width:100%;padding:18px 14px;background:var(--bg);border:1.5px dashed var(--border);border-radius:10px;font-size:13px;color:var(--m2);cursor:pointer;transition:all .2s;position:relative;">'+
+        '<div id="importZone" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;width:100%;padding:12px 14px;background:var(--bg);border:1.5px dashed var(--border);border-radius:10px;font-size:13px;color:var(--m2);cursor:pointer;transition:all .2s;position:relative;">'+
           '<span style="font-size:22px">📂</span>'+
           '<span>파일 선택 또는 드래그앤드롭</span>'+
           '<span style="font-size:10px;color:var(--muted)">.jpg 사진 / .txt 노트 — 복수 가능</span>'+
           '<input type="file" id="importInp" accept="image/*,.heic,.heif,.txt,text/plain" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;">'+
         '</div>'+
       '</div>'+
-      '<button id="reMkrBtn" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:12px;">\uD83D\uDD04 \uC0AC\uC9C4 \uB9C8\uCEE4 \uB2E4\uC2DC \uADF8\uB9AC\uAE30</button>'+
+      '<button id="reMkrBtn" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px;">\uD83D\uDD04 \uC0AC\uC9C4 \uB9C8\uCEE4 \uB2E4\uC2DC \uADF8\uB9AC\uAE30</button>'+
       '<div style="border-top:1px solid var(--border);margin-bottom:4px"></div>'+
     '</div>'+
     '<div class="li"><div class="li-th">📷</div><div class="li-inf"><div class="li-n">현장 사진</div><div class="li-s">'+photos.length+'개</div></div><button class="li-del" id="clrP">삭제</button></div>'+
     '<div class="li"><div class="li-th">📋</div><div class="li-inf"><div class="li-n">현장 조사</div><div class="li-s">'+surveys.length+'건</div></div><button class="li-del" id="clrS">삭제</button></div>'+
-    '<div style="padding:12px 16px 20px">'+
+    '<div style="padding:10px 14px 14px">'+
       '<button id="clrAll" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid var(--danger);background:transparent;color:var(--danger);font-size:14px;font-weight:600;cursor:pointer;">'+svgIc('trash','width:16px;height:16px;vertical-align:-3px;margin-right:6px')+'전체 초기화</button>'+
     '</div>';
 
@@ -4524,7 +4537,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.33 · 2026-06-24 · iOS hardening';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.34 · 2026-06-24 · collapse toggles, sheet fit, region fitBounds';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
