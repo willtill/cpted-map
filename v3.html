@@ -162,7 +162,7 @@ html,body{width:100%;height:100%;overflow:hidden;
   background:var(--panel);border-radius:20px 20px 0 0;
   transform:translateY(100%);
   transition:transform .3s cubic-bezier(.32,1,.6,1);
-  max-height:92vh;display:flex;flex-direction:column;
+  max-height:88vh;max-height:88svh;display:flex;flex-direction:column;
   padding-bottom:var(--safe-b);
 }
 .sheet.on{transform:translateY(0);}
@@ -3781,8 +3781,6 @@ function openMoreSheet(){
       '<button id="reMkrBtn" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px;">\uD83D\uDD04 \uC0AC\uC9C4 \uB9C8\uCEE4 \uB2E4\uC2DC \uADF8\uB9AC\uAE30</button>'+
       '<div style="border-top:1px solid var(--border);margin-bottom:4px"></div>'+
     '</div>'+
-    '<div class="li"><div class="li-th">📷</div><div class="li-inf"><div class="li-n">현장 사진</div><div class="li-s">'+photos.length+'개</div></div><button class="li-del" id="clrP">삭제</button></div>'+
-    '<div class="li"><div class="li-th">📋</div><div class="li-inf"><div class="li-n">현장 조사</div><div class="li-s">'+surveys.length+'건</div></div><button class="li-del" id="clrS">삭제</button></div>'+
     '<div style="padding:10px 14px 14px">'+
       '<button id="clrAll" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid var(--danger);background:transparent;color:var(--danger);font-size:14px;font-weight:600;cursor:pointer;">'+svgIc('trash','width:16px;height:16px;vertical-align:-3px;margin-right:6px')+'전체 초기화</button>'+
     '</div>';
@@ -3807,16 +3805,7 @@ function openMoreSheet(){
     closeAll();
     setTimeout(function(){ importFromFiles(files); }, 300);
   });
-  document.getElementById('clrP').addEventListener('click',function(){
-    if(!confirm('사진 '+photos.length+'개 삭제?'))return;
-    LAYERS.photo.mkrs.forEach(function(m){map.removeLayer(m);}); LAYERS.photo.mkrs=[]; LAYERS.photo.cnt=0;
-    photos=[]; idbClear('photos'); updCounts(); toast('삭제됨'); closeAll();
-  });
-  document.getElementById('clrS').addEventListener('click',function(){
-    if(!confirm('조사 '+surveys.length+'건 삭제?'))return;
-    LAYERS.survey.mkrs.forEach(function(m){map.removeLayer(m);}); LAYERS.survey.mkrs=[]; LAYERS.survey.cnt=0;
-    surveys=[]; idbClear('surveys'); updCounts(); toast('삭제됨'); closeAll();
-  });
+  // 개별 삭제(사진/조사) 행은 더보기에서 제거됨 — 전체 초기화만 유지
   document.getElementById('clrAll').addEventListener('click',function(){
     if(!confirm('모든 현장 기록을 초기화할까요?\n사진 '+photos.length+'개 + 노트 '+surveys.length+'건\n\n이 작업은 되돌릴 수 없습니다.')) return;
     if(!confirm('정말 초기화하시겠습니까?')) return;
@@ -4537,7 +4526,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.34 · 2026-06-24 · collapse toggles, sheet fit, region fitBounds';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.35 · 2026-06-24 · sheet fits screen (svh), trim 더보기';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
