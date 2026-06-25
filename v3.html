@@ -418,7 +418,7 @@ html,body{width:100%;height:100%;overflow:hidden;
   --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
   --sh-card:0 1px 2px rgba(16,32,43,.05),0 2px 8px rgba(16,32,43,.05);
   --sh-fab:0 6px 18px rgba(30,58,95,.34),0 2px 6px rgba(16,32,43,.16);
-  --track:#C6D0DD; --track-fill:#7491B1; --tog-off:#BCC7D5;
+  --track:#C6D0DD; --track-fill:#7E93A8; --tog-off:#BCC7D5;
 }
 .glassblur{backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);}
 
@@ -461,12 +461,21 @@ html,body{width:100%;height:100%;overflow:hidden;
 
 /* ── 레이어: iOS 토글 스위치 + 슬라이더 ── */
 .lp-row{border-bottom:.5px solid var(--sep);padding:11px 16px;}
-.lp-eye{width:46px;height:28px;border-radius:15px;background:var(--green);position:relative;flex-shrink:0;
+.lp-eye{width:46px;height:28px;border-radius:15px;background:#1E3A5F;position:relative;flex-shrink:0;
   font-size:0;color:transparent;cursor:pointer;transition:background .25s ease;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.04);}
 .lp-eye::after{content:"";position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:#fff;
   box-shadow:0 2px 5px rgba(0,0,0,.22),0 0 0 .5px rgba(0,0,0,.04);transition:transform .25s cubic-bezier(.3,1.3,.5,1);transform:translateX(18px);}
 .lp-eye.off{background:var(--fill2);}
 .lp-eye.off::after{transform:translateX(0);}
+.lp-ico{width:20px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.lp-cnt{font-size:12px;font-weight:500;color:var(--muted);min-width:18px;text-align:center;flex-shrink:0;}
+.lp-nm{flex:1;font-size:13px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lp-grp.cur > .lp-grp-hd{background:#C9D7E8;}
+.lp-grp.cur .lp-grp-body .lp-row{background:#EAF0F7;}
+.lp-grp-sw{width:46px;height:28px;border-radius:15px;background:#1E3A5F;position:relative;flex-shrink:0;cursor:pointer;outline:2px solid #16314F;outline-offset:-1px;}
+.lp-grp-sw::after{content:"";position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .15s;transform:translateX(18px);box-shadow:0 1px 2px rgba(0,0,0,.25);}
+.lp-grp-sw.off{background:var(--fill2);outline-color:var(--border);}
+.lp-grp-sw.off::after{transform:translateX(0);}
 .lp-col{width:11px;height:11px;border-radius:50%;}
 .lp-n{font-size:15px;font-weight:500;letter-spacing:-.2px;}
 .lp-c{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;}
@@ -577,6 +586,23 @@ html,body{width:100%;height:100%;overflow:hidden;
 .sheet{background:#CBD9EC}
 .sh-bar{background:#AEC0D8}
 .sh-body{background:var(--panel)}
+/* === 시트 헤더 네이비 (전 시트 공통) — 헤더가 둥근 상단까지 꽉 차게 === */
+.sheet{overflow:hidden;}
+.sh-bar{width:100%;height:auto;margin:0;padding:11px 0 0;background:#1E3A5F;display:flex;justify-content:center;flex-shrink:0;border-radius:0;}
+.sh-bar::after{content:"";width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.4);}
+.sh-hd{background:#1E3A5F;border-bottom:none;padding:8px 16px 14px;}
+.sh-title{color:#fff;}
+.sh-x{background:rgba(255,255,255,.16);color:#fff;border:none;}
+/* 더보기(설정 성격)는 기존 라이트블루 헤더 유지 */
+.sheet.more-sheet .sh-bar{width:36px;height:4px;margin:9px auto 0;padding:0;background:#AEC0D8;display:block;border-radius:2px;}
+.sheet.more-sheet .sh-bar::after{content:none;}
+.sheet.more-sheet .sh-hd{background:#CBD9EC;border-bottom:1px solid #B6C8E0;}
+.sheet.more-sheet .sh-title{color:var(--accent);}
+.sheet.more-sheet .sh-x{background:#fff;color:var(--m2);}
+/* 지도·방위표 버튼: 우상단 세로 배치 + 원형 통일 */
+.tbtn{width:40px;height:40px;border-radius:50%;}
+.mc-north{width:40px;height:40px;border-radius:50%;}
+.top-rstack{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
 /* 지도 선택 — 섹션 라벨(글로벌·VWorld) 네이비로 또렷하게 */
 .mg-sec{display:flex;align-items:center;gap:7px;font-family:inherit;font-size:12px;font-weight:700;
   color:var(--accent);letter-spacing:.02em;text-transform:none;padding:12px 2px 5px}
@@ -596,7 +622,7 @@ html,body{width:100%;height:100%;overflow:hidden;
   color:var(--accent);text-shadow:none;line-height:1;letter-spacing:-.3px}
 
 /* ═══ v3.32 상단 단일 도형: CPTED MAP + 사진·노트 칩을 한 펄 안에, 높이=지도 버튼(38px) ═══ */
-.top{align-items:center;justify-content:space-between;}
+.top{align-items:flex-start;justify-content:space-between;}
 .top-bar{display:inline-flex;align-items:center;gap:11px;height:38px;padding:0 14px;
   background:rgba(255,255,255,.9);backdrop-filter:blur(14px) saturate(180%);-webkit-backdrop-filter:blur(14px) saturate(180%);
   border-radius:11px;box-shadow:0 1px 5px rgba(16,32,43,.16),0 0 0 .5px rgba(16,32,43,.04);}
@@ -656,7 +682,7 @@ html,body{width:100%;height:100%;overflow:hidden;
 <symbol id="ic-warn" viewBox="0 0 24 24"><path d="M12 4.4 21 19.2H3Z"/><path d="M12 10.4v4"/><circle cx="12" cy="16.6" r=".8" fill="currentColor" stroke="none"/></symbol>
 <symbol id="ic-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/></symbol>
 <symbol id="ic-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></symbol>
-<symbol id="ic-file" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7Z"/><path d="M14 3v4h4"/></symbol>
+<symbol id="ic-file" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7Z"/><path d="M14 3v4h4"/></symbol><symbol id="ic-sliders" viewBox="0 0 24 24"><path d="M4 7h9.5M18.5 7H20"/><circle cx="16" cy="7" r="2.3"/><path d="M4 12h3.5M12.5 12H20"/><circle cx="10" cy="12" r="2.3"/><path d="M4 17h7.5M16.5 17H20"/><circle cx="14" cy="17" r="2.3"/></symbol><symbol id="ic-folder" viewBox="0 0 24 24"><path d="M4 6.2h5l2 2.3h9v9.8a1.2 1.2 0 0 1-1.2 1.2H5.2A1.2 1.2 0 0 1 4 18.3Z"/></symbol>
 <symbol id="ic-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
 <symbol id="ic-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
 <symbol id="ic-mt-street" viewBox="0 0 24 24"><path d="M9 4 3 6.2v14L9 18l6 2.2 6-2.2v-14L15 6.2 9 4Z"/><path d="M9 4v14M15 6.2v14"/></symbol>
@@ -676,7 +702,7 @@ html,body{width:100%;height:100%;overflow:hidden;
     <div class="chip" style="color:#10b981;"><svg class="svi" style="width:15px;height:15px;vertical-align:-3px;margin-right:3px"><use href="#ic-camera"></use></svg><b id="pcnt">0</b></div>
     <div class="chip" style="color:#f59e0b;"><svg class="svi" style="width:15px;height:15px;vertical-align:-3px;margin-right:3px"><use href="#ic-survey"></use></svg><b id="scnt">0</b></div>
   </div>
-  <button class="tbtn" id="mapSwBtn"><svg class="svi" style="width:22px;height:22px"><use href="#ic-map"></use></svg></button>
+  <div class="top-rstack"><button class="tbtn" id="mapSwBtn"><svg class="svi" style="width:22px;height:22px"><use href="#ic-map"></use></svg></button><button class="mc mc-north" id="northBtn" title="탭: 정북 복귀 · 길게: 정북 고정"><svg id="northNeedle" width="26" height="26" viewBox="0 0 26 26"><polygon points="13,3 8,13 18,13" fill="#ef4444"/><polygon points="13,23 8,13 18,13" fill="#94a3b8"/><circle cx="13" cy="13" r="1.7" fill="#fff"/></svg></button></div>
   
 </div>
 
@@ -685,7 +711,6 @@ html,body{width:100%;height:100%;overflow:hidden;
 
 <!-- MAP CONTROLS -->
 <div class="mctrl">
-  <button class="mc mc-north" id="northBtn" title="탭: 정북 복귀 · 길게: 정북 고정"><svg id="northNeedle" width="26" height="26" viewBox="0 0 26 26"><text x="13" y="7" text-anchor="middle" font-size="7" font-weight="700" fill="#1e293b">N</text><polygon points="13,8 9,19 13,16 17,19" fill="#ef4444"/></svg></button>
   <button class="mc" id="locBtn"><svg class="svi" style="width:22px;height:22px"><use href="#ic-locate"></use></svg></button>
   <button class="mc" id="rotBtn" title="네비게이션 모드(방향따라 회전)"><svg class="svi" style="width:22px;height:22px"><use href="#ic-compass"></use></svg></button>
   <button class="mc" id="ziBtn"><svg class="svi" style="width:20px;height:20px;stroke-width:2.2"><use href="#ic-plus"></use></svg></button>
@@ -1558,6 +1583,12 @@ function setLayerOp(id, v) {
   LAYERS[id].mkrs.forEach(function(m){ var e=m.getElement(); if(e) e.style.opacity=v; });
   saveLayers();
 }
+function _baseSz(id){
+  if(L_BASE[id]!=null) return L_BASE[id];
+  if(id.indexOf('bell')===0) return 18;
+  if(id.indexOf('vacant')===0||id.indexOf('light')===0||id.indexOf('cctv')===0||id.indexOf('park')===0||id.indexOf('post')===0) return 16;
+  return 20;
+}
 function setLayerSz(id, v) {
   // 경계선: sz 슬라이더는 선 두께를 의미
   if (id==='boundary' || id==='boundary_smj' || id==='boundary_sj' || id==='boundary_bs' || id==='boundary_gn' || id==='boundary_un') {
@@ -1566,12 +1597,15 @@ function setLayerSz(id, v) {
     saveLayers(); return;
   }
   LAYERS[id].sz = v;
-  var base = L_BASE[id]||20, sz = Math.round(base*v);
+  var base = _baseSz(id), sz = Math.round(base*v);
   LAYERS[id].mkrs.forEach(function(m){
     var ico;
-    if (id==='vacant')  ico = L.divIcon({html:'<div class="vh-pin">'+vhSvg(sz)+'</div>',className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz]});
-    else if (id==='light')  ico = ciIcon('#f59e0b','💡',sz);
-    else if (id==='cctv')   ico = ciIcon('#3b82f6','📹',sz);
+    if (id.indexOf('vacant')===0)  ico = L.divIcon({html:'<div class="vh-pin">'+vhSvg(sz)+'</div>',className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz]});
+    else if (id.indexOf('light')===0)  ico = ciIcon('#f59e0b','💡',sz);
+    else if (id.indexOf('cctv')===0)   ico = ciIcon('#3b82f6','📹',sz);
+    else if (id.indexOf('bell')===0)   ico = ciIcon(LAYERS[id].color,'🔔',sz);
+    else if (id.indexOf('park')===0)   ico = ciIcon(LAYERS[id].color,'🅿',sz);
+    else if (id.indexOf('post')===0)   ico = ciIcon(LAYERS[id].color,'🚨',sz);
     else if (id==='survey') ico = svIcon(m._sv, sz);
     else if (id==='photo')  ico = pinIcon(m._pd||'', sz, m._heading);
     if (ico) m.setIcon(ico);
@@ -1623,7 +1657,7 @@ function initSafemap() {
 
 // ══ ICON HELPERS ══
 // ── Sightline 아이콘 헬퍼: 이모지 또는 id → 인라인 SVG ──
-var _ICONS={'\uD83D\uDCF9':'cctv','\uD83D\uDCA1':'light','\uD83C\uDD7F':'parking','\uD83D\uDEA8':'post','\uD83D\uDD14':'bell','\uD83C\uDFDA':'vacant','\uD83D\uDDC2':'area','\uD83D\uDCCB':'survey','\uD83D\uDEE1':'shield','\uD83D\uDCF7':'camera','\uD83D\uDCF8':'camera','\uD83D\uDCDD':'note','\uD83D\uDCCD':'pin','\uD83C\uDFAF':'target','\uD83E\uDDED':'compass','\u2197':'navigate','\uD83D\uDC41':'eye','\uD83D\uDDFA':'map','\uD83D\uDCE5':'import','\uD83D\uDCE4':'export','\uD83D\uDDD1':'trash','\uD83D\uDD04':'refresh','\uD83D\uDD12':'lock','\uD83D\uDD13':'unlock','\u2605':'star-fill','\u2606':'star','\u2713':'check','\u2705':'check','\u26A0':'warn','\u2715':'x','\u25B6':'chevron-r','\u25B8':'chevron-r','\u25C0':'eye','\u2298':'eye-off','\u229E':'layers','\u22EF':'more','\u2190':'back','\uD83D\uDCCA':'layers','\uD83D\uDCC2':'import','\uD83D\uDCBE':'check','\uD83D\uDCC4':'file','\uD83D\uDD0D':'search','\uD83D\uDC4A':'warn','\uD83D\uDD75':'warn','\uD83E\uDD77':'warn'};
+var _ICONS={'\uD83D\uDCF9':'cctv','\uD83D\uDCA1':'light','\uD83C\uDD7F':'parking','\uD83D\uDEA8':'post','\uD83D\uDD14':'bell','\uD83C\uDFDA':'vacant','\uD83D\uDDC2':'area','\uD83D\uDCCB':'survey','\uD83D\uDEE1':'shield','\uD83D\uDCF7':'camera','\uD83D\uDCF8':'camera','\uD83D\uDCDD':'note','\uD83D\uDCCD':'pin','\uD83C\uDFAF':'target','\uD83E\uDDED':'compass','\u2197':'navigate','\uD83D\uDC41':'eye','\uD83D\uDDFA':'map','\uD83D\uDCE5':'import','\uD83D\uDCE4':'export','\uD83D\uDDD1':'trash','\uD83D\uDD04':'refresh','\u2699\uFE0F':'sliders','\u2699':'sliders','\uD83D\uDD12':'lock','\uD83D\uDD13':'unlock','\u2605':'star-fill','\u2606':'star','\u2713':'check','\u2705':'check','\u26A0':'warn','\u2715':'x','\u25B6':'chevron-r','\u25B8':'chevron-r','\u25C0':'eye','\u2298':'eye-off','\u229E':'layers','\u22EF':'more','\u2190':'back','\uD83D\uDCCA':'layers','\uD83D\uDCC2':'import','\uD83D\uDCBE':'check','\uD83D\uDCC4':'file','\uD83D\uDD0D':'search','\uD83D\uDC4A':'warn','\uD83D\uDD75':'warn','\uD83E\uDD77':'warn'};
 function svgIc(tok, style){ var id=_ICONS[tok]||tok; return '<svg class="svi"'+(style?' style="'+style+'"':'')+'><use href="#ic-'+id+'"></use></svg>'; }
 function _sliderFill(el){ if(!el)return; var mn=parseFloat(el.min)||0, mx=parseFloat(el.max); if(isNaN(mx))mx=1; var v=parseFloat(el.value); var p=(mx>mn)?((v-mn)/(mx-mn))*100:0; el.style.background='linear-gradient(to right,var(--track-fill) 0 '+p+'%,var(--track) '+p+'% 100%)'; }
 function ciIcon(color, tok, sz) {
@@ -1677,6 +1711,7 @@ function _sheetTitle(title){
   return ico+t;
 }
 function openSheet(title, html) {
+  document.getElementById('sheet').classList.remove('more-sheet'); // 더보기 외엔 네이비 헤더
   document.getElementById('shTitle').innerHTML = _sheetTitle(title);
   document.getElementById('shBody').innerHTML = html||'';
   document.getElementById('ov').classList.add('on');
@@ -3084,6 +3119,7 @@ function openSurveyList(){
   openSheet('📋 현장 기록 ('+total+')', '<div id="slRoot"></div>');
   var body = document.getElementById('shBody'); if(body) body.onclick=_slClick;
   _expSel={}; _expOpen={}; _expGroupsBuild();
+  _expGroups.forEach(function(g){ _expOpen[g.id]=true; }); // 모든 지역 그룹 펼침
   _renderSurveyList();
 }
 function _slTitleSync(){ var el=document.getElementById('shTitle'); if(el) el.textContent='📋 현장 기록 ('+(photos.length+surveys.length)+')'; }
@@ -3104,13 +3140,13 @@ function _slRow(rec,isPhoto){
   var th=thumb?'<img src="'+thumb+'" style="width:34px;height:34px;border-radius:6px;object-fit:cover;flex:none;">'
               :'<div style="width:34px;height:34px;border-radius:6px;background:var(--p2);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px;">'+(isPhoto?'📷':'📋')+'</div>';
   var ty=isPhoto?'photo':'survey', eid=_escHtml(rec.id);
-  return '<div style="display:flex;align-items:center;gap:9px;padding:8px 10px 8px 16px;border-top:0.5px solid var(--border);">'+
-    '<span class="sl-chk" data-id="'+eid+'" style="cursor:pointer;flex:none;">'+_chk(sel?'all':'none')+'</span>'+
+  return '<div style="display:flex;align-items:center;gap:9px;padding:8px 12px 8px 16px;border-top:0.5px solid var(--border);">'+
     '<div class="sl-go" data-id="'+eid+'" data-type="'+ty+'" style="flex:1;min-width:0;display:flex;align-items:center;gap:9px;cursor:pointer;">'+
       th+
       '<div style="flex:1;min-width:0;"><div style="font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_escHtml(title)+badge+origChip+'</div><div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_escHtml(sub)+'</div></div>'+
     '</div>'+
     '<span class="sl-del" data-id="'+eid+'" data-type="'+ty+'" style="cursor:pointer;flex:none;color:var(--danger);font-size:15px;padding:3px 5px;">'+svgIc('trash','width:15px;height:15px')+'</span>'+
+    '<span class="sl-chk" data-id="'+eid+'" style="cursor:pointer;flex:none;">'+_chk(sel?'all':'none')+'</span>'+
   '</div>';
 }
 function _renderSurveyList(){
@@ -3139,9 +3175,9 @@ function _renderSurveyList(){
     var state=sc===0?'none':(sc===ids.length?'all':'part'), open=_expOpen[g.id];
     h+='<div style="border:0.5px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden;">';
     h+='<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--p2);">'+
-         '<span class="sl-rchk" data-rid="'+_escHtml(g.id)+'" style="cursor:pointer;flex:none;">'+_chk(state)+'</span>'+
+         '<span class="sl-rhd" data-rid="'+_escHtml(g.id)+'" style="color:var(--muted);cursor:pointer;font-size:13px;flex:none;">'+(open?svgIc('chevron-d','width:18px;height:18px'):svgIc('chevron-r','width:18px;height:18px'))+'</span>'+
          '<div class="sl-rhd" data-rid="'+_escHtml(g.id)+'" style="flex:1;cursor:pointer;"><span style="font-weight:600;color:var(--text);">'+_escHtml(g.name)+'</span> <span style="font-size:11px;color:var(--muted);">· 사진 '+g.photos.length+(g.surveys.length?' · 노트 '+g.surveys.length:'')+'</span></div>'+
-         '<span class="sl-rhd" data-rid="'+_escHtml(g.id)+'" style="color:var(--muted);cursor:pointer;font-size:13px;flex:none;">'+(open?svgIc('chevron-d','width:12px;height:12px'):svgIc('chevron-r','width:12px;height:12px'))+'</span>'+
+         '<span class="sl-rchk" data-rid="'+_escHtml(g.id)+'" style="cursor:pointer;flex:none;">'+_chk(state)+'</span>'+
        '</div>';
     if(open){ g.photos.forEach(function(p){h+=_slRow(p,true);}); g.surveys.forEach(function(s){h+=_slRow(s,false);}); }
     h+='</div>';
@@ -3275,7 +3311,7 @@ function buildDataSheet() {
     var hd = document.createElement('div'); hd.className='lp-grp-hd' + (rg.expanded?' open':'');
     hd.innerHTML =
       '<span class="lp-grp-caret">'+svgIc('chevron-r','width:13px;height:13px')+'</span>'+
-      '<span>📍 '+rg.name+'</span>'+
+      '<span>'+svgIc('pin','width:14px;height:14px;color:var(--accent);vertical-align:-2px;margin-right:2px')+rg.name+'</span>'+
       '<span class="lp-grp-cnt">'+totalItems+'개</span>'+
       (rg.center ? '<span class="lp-grp-fly" data-rid="'+rg.id+'" title="이 지역으로 이동" style="cursor:pointer;padding:2px 8px;border-radius:4px;font-size:12px;color:var(--accent);margin-left:auto;">'+svgIc('navigate','width:16px;height:16px')+'</span>' : '');
     grp.appendChild(hd);
@@ -3513,10 +3549,10 @@ function makeLayerRow(id) {
   }
 
   row.innerHTML =
-    '<div class="lp-eye'+(ly.visible?'':' off')+'" data-id="'+id+'"></div>'+
-    '<div class="lp-col" style="background:'+ly.color+'"></div>'+
-    '<div class="lp-inf"><div class="lp-n">'+svgIc(ly.icon,'color:'+ly.color+';width:17px;height:17px;margin-right:6px;vertical-align:-3px')+ly.name+'</div><div class="lp-c">'+(isWms?(ly.wms?'활성 · WMS':'키 미설정'):(ly.cnt+'개'))+'</div></div>'+
-    '<div class="lp-sls">'+slHtml+'</div>';
+    '<div class="lp-ico">'+svgIc(ly.icon,'color:'+ly.color+';width:18px;height:18px')+'</div>'+
+    '<div class="lp-cnt">'+(isWms?(ly.wms?'활성':'키없음'):(ly.cnt>0?ly.cnt:''))+'</div>'+
+    '<div class="lp-nm">'+ly.name+'</div>'+
+    '<div class="lp-eye'+(ly.visible?'':' off')+'" data-id="'+id+'"></div>';
   row.querySelector('.lp-eye').addEventListener('click', function(e){
     e.stopPropagation();
     var lid=this.dataset.id; LAYERS[lid].visible=!LAYERS[lid].visible;
@@ -3525,16 +3561,6 @@ function makeLayerRow(id) {
     var t = (document.getElementById('shTitle')||{}).textContent || '';
     if (t.indexOf('범죄') >= 0) buildCrimeSheet();
     else buildLP();
-  });
-  row.querySelectorAll('.lp-sl').forEach(function(sl){
-    _sliderFill(sl);
-    sl.addEventListener('input',function(){
-      _sliderFill(this);
-      var v=parseFloat(this.value), lid=this.dataset.id, tp=this.dataset.tp;
-      var isB = (lid==='boundary' || lid==='boundary_smj' || lid==='boundary_un');
-      if(tp==='op'){ setLayerOp(lid,v); var el=document.getElementById('ov-'+lid); if(el)el.textContent=Math.round(v*100)+'%'; }
-      else        { setLayerSz(lid,v); var el=document.getElementById('sv-'+lid); if(el)el.textContent=isB?v.toFixed(1):Math.round(v*100)+'%'; }
-    });
   });
   return row;
 }
@@ -3609,8 +3635,11 @@ function appendLayerRow(parent, lid){
   parent.appendChild(list);
 }
 
+// 현재 보고 있는 지역 id (지도 초기화 위치 = 가장 최근 추가 지역)
+var curRegionId = REGIONS.length ? REGIONS[REGIONS.length-1].id : null;
 // 지역 바로가기: 해당 지역 경계선이 화면에 다 들어오도록 이동 (경계 없으면 center로 폴백)
 function gotoRegion(rg){
+  if (rg && rg.id) curRegionId = rg.id; // 현재 지역 갱신
   var pts=[];
   if (rg && rg.layers){
     for (var gi=0; gi<rg.layers.length; gi++){
@@ -3635,7 +3664,7 @@ function buildLP(){
 
   // ── 2. 지역별 그룹 · 최근 추가 지역이 위로
   REGIONS.slice().reverse().forEach(function(rg){
-    var grp = document.createElement('div'); grp.className='lp-grp';
+    var grp = document.createElement('div'); grp.className='lp-grp'+(rg.id===curRegionId?' cur':'');
     // 그룹 내 켜진 레이어 수 / 전체
     var onCnt = rg.layers.filter(function(lid){ return LAYERS[lid] && LAYERS[lid].visible; }).length;
     var totalMkrs = rg.layers.reduce(function(s,lid){ return s + (LAYERS[lid] ? LAYERS[lid].cnt : 0); }, 0);
@@ -3644,11 +3673,11 @@ function buildLP(){
     hd.dataset.rid = rg.id;
     hd.innerHTML =
       '<span class="lp-grp-caret" title="펼치기/접기">'+svgIc('chevron-r','width:18px;height:18px')+'</span>'+
-      '<span class="lp-grp-name" title="이 지역으로 이동">📍 '+rg.name+(rg.center?' '+svgIc('navigate','width:14px;height:14px;color:var(--accent);vertical-align:-2px;margin-left:1px'):'')+'</span>'+
+      '<span class="lp-grp-name" title="이 지역으로 이동">'+svgIc('pin','width:15px;height:15px;color:var(--accent);vertical-align:-2px;margin-right:3px')+''+rg.name+(rg.center?' '+svgIc('navigate','width:14px;height:14px;color:var(--accent);vertical-align:-2px;margin-left:1px'):'')+'</span>'+
       '<span class="lp-grp-cnt">'+totalMkrs+'개</span>'+
       '<span class="lp-grp-act">'+
         '<span class="lp-grp-note" data-rid="'+rg.id+'" title="이 지역에 노트 추가">'+svgIc('note','width:20px;height:20px;color:var(--muted)')+'</span>'+
-        '<span class="lp-grp-eye" data-rid="'+rg.id+'" title="지역 전체 켜기/끄기">'+(onCnt===rg.layers.length?svgIc('eye','color:var(--accent);width:20px;height:20px'):(onCnt>0?svgIc('eye-half','color:var(--muted);width:20px;height:20px'):svgIc('eye-off','color:var(--faint);width:20px;height:20px')))+'</span>'+
+        '<div class="lp-grp-sw'+(onCnt>0?'':' off')+'" data-rid="'+rg.id+'" title="지역 전체 켜기/끄기"></div>'+
       '</span>';
     grp.appendChild(hd);
     // 본문 (레이어 행들)
@@ -3685,11 +3714,11 @@ function buildLP(){
       setTimeout(function(){ openSurveyForm(null, rg); }, 250);
     });
     // 전체 켜기/끄기 버튼
-    hd.querySelector('.lp-grp-eye').addEventListener('click', function(e){
+    hd.querySelector('.lp-grp-sw').addEventListener('click', function(e){
       e.stopPropagation();
-      var allOn = rg.layers.every(function(lid){ return LAYERS[lid] && LAYERS[lid].visible; });
+      var anyOn = rg.layers.some(function(lid){ return LAYERS[lid] && LAYERS[lid].visible; });
       rg.layers.forEach(function(lid){
-        if (LAYERS[lid]) { LAYERS[lid].visible = !allOn; applyVis(lid); }
+        if (LAYERS[lid]) { LAYERS[lid].visible = !anyOn; applyVis(lid); }
       });
       saveLayers(); buildLP();
     });
@@ -3719,35 +3748,7 @@ function openMapSheet(){
   });
   body.appendChild(grid);
 
-  // ── 배경 지도 채도/밝기 조정 ──
-  var cur; try{ cur = JSON.parse(localStorage.getItem('mapfilter')) || {s:1,b:1}; }catch(_){ cur={s:1,b:1}; }
-  var ctrl=document.createElement('div');
-  ctrl.style.cssText='padding:12px 16px;border-top:1px solid var(--border);margin-top:6px;';
-  ctrl.innerHTML=
-    '<div style="font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--accent);margin-bottom:10px">배경 지도 조정 <span style="font-weight:400;letter-spacing:0;color:var(--muted)">(마커·경계는 그대로)</span></div>'+
-    '<div style="display:flex;gap:6px;margin-bottom:14px">'+
-      '<button class="msat-preset" data-s="1" data-b="1">원본</button>'+
-      '<button class="msat-preset" data-s="0.45" data-b="1.08">연하게</button>'+
-      '<button class="msat-preset" data-s="0" data-b="1.05">흑백</button>'+
-    '</div>'+
-    '<label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:10px;margin-bottom:10px">채도'+
-      '<input class="msld" type="range" id="satRange" min="0" max="150" step="5" style="flex:1">'+
-      '<span id="satVal" style="font-family:monospace;font-size:11px;width:40px;text-align:right;color:var(--text)"></span></label>'+
-    '<label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:10px">밝기'+
-      '<input class="msld" type="range" id="briRange" min="70" max="130" step="2" style="flex:1">'+
-      '<span id="briVal" style="font-family:monospace;font-size:11px;width:40px;text-align:right;color:var(--text)"></span></label>';
-  body.appendChild(ctrl);
-
-  var satR=document.getElementById('satRange'), briR=document.getElementById('briRange');
-  var satV=document.getElementById('satVal'), briV=document.getElementById('briVal');
-  satR.value=Math.round(cur.s*100); briR.value=Math.round(cur.b*100);
-  function refl(){ satV.textContent=satR.value+'%'; briV.textContent=briR.value+'%'; }
-  function applyF(){ setMapFilter(satR.value/100, briR.value/100); refl(); _sliderFill(satR); _sliderFill(briR); }
-  refl(); _sliderFill(satR); _sliderFill(briR);
-  satR.addEventListener('input',applyF); briR.addEventListener('input',applyF);
-  Array.prototype.forEach.call(ctrl.querySelectorAll('.msat-preset'),function(btn){
-    btn.addEventListener('click',function(){ satR.value=Math.round(this.dataset.s*100); briR.value=Math.round(this.dataset.b*100); applyF(); });
-  });
+  // (배경 지도 조정은 옵션 시트로 이동됨)
 }
 document.getElementById('mapSwBtn').addEventListener('click', openMapSheet);
 
@@ -3756,36 +3757,140 @@ document.getElementById('mapSwBtn').addEventListener('click', openMapSheet);
 // vwBtn 제거됨
 
 // ══ MORE SHEET ══
+function openOptionsSheet(){
+  openSheet('⚙️ 옵션','');
+  var body=document.getElementById('shBody'); if(!body)return;
+  var fac=[], bnd=[], wms=[];
+  Object.keys(LAYERS).forEach(function(id){
+    var ly=LAYERS[id];
+    if(ly.wmsId) wms.push(id);
+    else if(id.indexOf('boundary')===0) bnd.push(id);
+    else if(id==='photo'||id==='survey'){}
+    else fac.push(id);
+  });
+  function rv(ids,k,d){ for(var i=0;i<ids.length;i++){ if(LAYERS[ids[i]]&&LAYERS[ids[i]][k]!=null) return LAYERS[ids[i]][k]; } return d; }
+  var fSz=rv(fac,'sz',1), fOp=rv(fac,'opacity',1);
+  var rSz=(LAYERS.photo&&LAYERS.photo.sz!=null)?LAYERS.photo.sz:1;
+  var bW=rv(bnd,'weight',2.5), bOp=rv(bnd,'opacity',.15), wOp=rv(wms,'opacity',.6);
+  var pct=function(v){return Math.round(v*100)+'%';};
+  function secH(emoji,title,first,rid){
+    var mt=first?'0 0 12px':'18px 0 12px';
+    var bt=first?'':'padding-top:14px;border-top:0.5px solid var(--border);';
+    var btn=rid?'<button id="'+rid+'" title="이 구역 기본값으로" style="margin-left:auto;flex:none;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;padding:3px 9px;border-radius:7px;cursor:pointer;">↺ 기본값</button>':'';
+    return '<div style="display:flex;align-items:center;gap:8px;margin:'+mt+';'+bt+'"><span style="font-size:15px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:7px;">'+svgIc(emoji,'width:17px;height:17px')+'<span>'+title+'</span></span>'+btn+'</div>';
+  }
+  function lblCol(label,defv){
+    return '<span style="width:118px;flex-shrink:0;"><span style="font-size:13px;color:var(--muted);display:block;line-height:1.2;">'+label+'</span><span style="font-size:10px;color:var(--faint);">기본 '+defv+'</span></span>';
+  }
+  function sl(id,label,mn,mx,st,val,disp,defv){
+    return '<div style="display:flex;align-items:center;gap:10px;margin:0 0 12px;">'+lblCol(label,defv)+
+      '<input class="msld" type="range" id="'+id+'" min="'+mn+'" max="'+mx+'" step="'+st+'" value="'+val+'" style="flex:1;">'+
+      '<span id="'+id+'-v" style="font-size:12px;font-weight:600;min-width:42px;text-align:right;">'+disp+'</span></div>';
+  }
+  var h='<div style="padding:14px 16px 16px;">';
+  h+=secH('pin','마커 표시',true,'rsMk');
+  h+=sl('optFSz','시설물 마커 크기',.3,3,.1,fSz,pct(fSz),'100%');
+  h+=sl('optFOp','시설물 투명도',0,1,.05,fOp,pct(fOp),'100%');
+  h+=sl('optRSz','기록 마커 크기',.3,3,.1,rSz,pct(rSz),'100%');
+  h+=secH('area','구역계',false,'rsBd');
+  h+=sl('optBW','경계선 두께',1,6,.5,bW,bW.toFixed(1),'2.5');
+  h+=sl('optBOp','채움 투명도',0,1,.05,bOp,pct(bOp),'15%');
+  h+=secH('shield','범죄주의구간',false,'rsWm');
+  h+=sl('optWOp','투명도',0,1,.05,wOp,pct(wOp),'60%');
+  h+=secH('map','배경 지도',false,'rsBg');
+  h+='<div style="display:flex;gap:6px;margin-bottom:12px"><button class="msat-preset" data-s="1" data-b="1">원본</button><button class="msat-preset" data-s="0.45" data-b="1.08">연하게</button><button class="msat-preset" data-s="0" data-b="1.05">흑백</button></div>';
+  h+='<div style="display:flex;align-items:center;gap:10px;margin:0 0 12px;">'+lblCol('채도','100%')+'<input class="msld" type="range" id="satRange" min="0" max="150" step="5" style="flex:1"><span id="satVal" style="font-size:12px;font-weight:600;width:42px;text-align:right;"></span></div>';
+  h+='<div style="display:flex;align-items:center;gap:10px;margin:0 0 4px;">'+lblCol('밝기','100%')+'<input class="msld" type="range" id="briRange" min="70" max="130" step="2" style="flex:1"><span id="briVal" style="font-size:12px;font-weight:600;width:42px;text-align:right;"></span></div>';
+  h+=secH('file','데이터',false);
+  h+='<div style="display:flex;gap:8px;"><button id="optDelP" style="flex:1;padding:10px;border-radius:9px;border:1px solid var(--danger);background:transparent;color:var(--danger);font-size:13px;font-weight:500;cursor:pointer;">사진만 삭제</button><button id="optDelS" style="flex:1;padding:10px;border-radius:9px;border:1px solid var(--danger);background:transparent;color:var(--danger);font-size:13px;font-weight:500;cursor:pointer;">조사만 삭제</button></div>';
+  h+='<div style="margin-top:14px;padding:10px 12px;background:var(--p2);border-radius:9px;font-size:12px;color:var(--muted);line-height:1.5;">내보낼 때 iCloud · Google Drive 저장을 선택할 수 있습니다. (저장 경로 자동 지정은 모바일에서 미지원)</div>';
+  h+='</div>';
+  body.innerHTML=h;
+
+  ['optFSz','optFOp','optRSz','optBW','optBOp','optWOp'].forEach(function(id){ var e=document.getElementById(id); if(e)_sliderFill(e); });
+  function bindMarker(elId, ids, fn, disp){
+    var el=document.getElementById(elId); if(!el)return;
+    el.addEventListener('input',function(){ _sliderFill(this); var v=parseFloat(this.value); ids.forEach(function(id){ if(LAYERS[id]) fn(id,v); }); var o=document.getElementById(elId+'-v'); if(o)o.textContent=disp(v); });
+  }
+  bindMarker('optFSz', fac, setLayerSz, pct);
+  bindMarker('optFOp', fac, setLayerOp, pct);
+  bindMarker('optRSz', ['photo','survey'], setLayerSz, pct);
+  bindMarker('optWOp', wms, setLayerOp, pct);
+  var elBW=document.getElementById('optBW');
+  if(elBW) elBW.addEventListener('input',function(){ _sliderFill(this); var v=parseFloat(this.value); bnd.forEach(function(id){ if(LAYERS[id])LAYERS[id].weight=v; }); drawBoundaries(); saveLayers(); var o=document.getElementById('optBW-v'); if(o)o.textContent=v.toFixed(1); });
+  var elBO=document.getElementById('optBOp');
+  if(elBO) elBO.addEventListener('input',function(){ _sliderFill(this); var v=parseFloat(this.value); bnd.forEach(function(id){ if(LAYERS[id])LAYERS[id].opacity=v; }); drawBoundaries(); saveLayers(); var o=document.getElementById('optBOp-v'); if(o)o.textContent=pct(v); });
+
+  var cur; try{ cur=JSON.parse(localStorage.getItem('mapfilter'))||{s:1,b:1}; }catch(_){ cur={s:1,b:1}; }
+  var satR=document.getElementById('satRange'), briR=document.getElementById('briRange');
+  var satV=document.getElementById('satVal'), briV=document.getElementById('briVal');
+  if(satR&&briR){
+    satR.value=Math.round(cur.s*100); briR.value=Math.round(cur.b*100);
+    var reflM=function(){ satV.textContent=satR.value+'%'; briV.textContent=briR.value+'%'; };
+    var applyFM=function(){ setMapFilter(satR.value/100, briR.value/100); reflM(); _sliderFill(satR); _sliderFill(briR); };
+    reflM(); _sliderFill(satR); _sliderFill(briR);
+    satR.addEventListener('input',applyFM); briR.addEventListener('input',applyFM);
+    Array.prototype.forEach.call(document.querySelectorAll('.msat-preset'),function(btn){
+      btn.addEventListener('click',function(){ satR.value=Math.round(this.dataset.s*100); briR.value=Math.round(this.dataset.b*100); applyFM(); });
+    });
+  }
+
+  function resetSliders(mp){ Object.keys(mp).forEach(function(id){ var el=document.getElementById(id); if(el){ el.value=mp[id]; el.dispatchEvent(new Event('input')); } }); }
+  var rMk=document.getElementById('rsMk'); if(rMk) rMk.addEventListener('click',function(){ resetSliders({optFSz:1,optFOp:1,optRSz:1}); toast('마커 표시 기본값'); });
+  var rBd=document.getElementById('rsBd'); if(rBd) rBd.addEventListener('click',function(){ resetSliders({optBW:2.5,optBOp:.15}); toast('구역계 기본값'); });
+  var rWm=document.getElementById('rsWm'); if(rWm) rWm.addEventListener('click',function(){ resetSliders({optWOp:.6}); toast('범죄주의구간 기본값'); });
+  var rBg=document.getElementById('rsBg'); if(rBg) rBg.addEventListener('click',function(){ resetSliders({satRange:100,briRange:100}); toast('배경 지도 원본'); });
+
+  var dP=document.getElementById('optDelP');
+  if(dP) dP.addEventListener('click',function(){
+    if(!photos.length){ toast('삭제할 사진이 없습니다'); return; }
+    if(!confirm('사진 '+photos.length+'개를 삭제할까요?'))return;
+    LAYERS.photo.mkrs.forEach(function(m){map.removeLayer(m);}); LAYERS.photo.mkrs=[]; LAYERS.photo.cnt=0;
+    photos=[]; idbClear('photos'); updCounts(); toast('사진 삭제됨'); closeAll();
+  });
+  var dS=document.getElementById('optDelS');
+  if(dS) dS.addEventListener('click',function(){
+    if(!surveys.length){ toast('삭제할 조사가 없습니다'); return; }
+    if(!confirm('조사 '+surveys.length+'건을 삭제할까요?'))return;
+    LAYERS.survey.mkrs.forEach(function(m){map.removeLayer(m);}); LAYERS.survey.mkrs=[]; LAYERS.survey.cnt=0;
+    surveys=[]; idbClear('surveys'); updCounts(); toast('조사 삭제됨'); closeAll();
+  });
+}
 function openMoreSheet(){
   openSheet('⋯ 더보기','');
+  document.getElementById('sheet').classList.add('more-sheet'); // 더보기는 기존 라이트블루 헤더
   var body=document.getElementById('shBody');
   var total = photos.length + surveys.length;
   body.innerHTML=
-    '<div style="padding:10px 14px 4px">'+
+    '<div style="padding:12px 14px 2px">'+
+      '<button id="optBtn" style="width:100%;padding:13px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;">'+svgIc('sliders','width:18px;height:18px;vertical-align:-4px;margin-right:6px')+'옵션 · 표시 설정</button>'+
+    '</div>'+
+    '<div style="padding:8px 14px 4px">'+
       '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">내보내기 / 불러오기</div>'+
       '<div style="background:var(--p2);border-radius:12px;padding:11px;margin-bottom:8px">'+
-        '<div style="font-size:14px;font-weight:600;margin-bottom:4px">'+svgIc('export','width:15px;height:15px;color:var(--accent);vertical-align:-2px;margin-right:5px')+'내보내기(.ZIP)</div>'+
+        '<div style="font-size:14px;font-weight:600;margin-bottom:4px">'+svgIc('export','width:18px;height:18px;color:var(--accent);vertical-align:-4px;margin-right:5px')+'내보내기(.ZIP)</div>'+
         '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">사진 <b style="color:var(--green)">'+photos.length+'</b>개 + 노트 <b style="color:var(--purple)">'+surveys.length+'</b>건 · 지역별로 선택해 사진·노트·목록(CSV)을 ZIP으로 압축</div>'+
-        '<button class="sf-save" id="exportBtn"'+(total?'':' disabled style="opacity:.4"')+'>'+svgIc('export','width:16px;height:16px;color:#fff;vertical-align:-3px;margin-right:6px')+'내보내기(.ZIP)</button>'+
+        '<button class="sf-save" id="exportBtn"'+(total?'':' disabled style="opacity:.4"')+'>'+svgIc('export','width:18px;height:18px;color:#fff;vertical-align:-4px;margin-right:6px')+'내보내기(.ZIP)</button>'+
       '</div>'+
       '<div style="background:var(--p2);border-radius:12px;padding:11px;margin-bottom:8px">'+
-        '<div style="font-size:14px;font-weight:600;margin-bottom:4px">'+svgIc('import','width:15px;height:15px;color:var(--accent);vertical-align:-2px;margin-right:5px')+'사진·노트 불러오기</div>'+
+        '<div style="font-size:14px;font-weight:600;margin-bottom:4px">'+svgIc('import','width:18px;height:18px;color:var(--accent);vertical-align:-4px;margin-right:5px')+'사진·노트 불러오기</div>'+
         '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">갤러리 사진(JPEG) 또는 내보낸 파일(JPEG·TXT) 선택·드래그 — EXIF 위치로 자동 배치, 분류는 나중 편집</div>'+
         '<div id="importZone" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;width:100%;padding:12px 14px;background:var(--bg);border:1.5px dashed var(--border);border-radius:10px;font-size:13px;color:var(--m2);cursor:pointer;transition:all .2s;position:relative;">'+
-          '<span style="font-size:22px">📂</span>'+
+          '<span style="color:var(--accent)">'+svgIc('folder','width:26px;height:26px')+'</span>'+
           '<span>파일 선택 또는 드래그앤드롭</span>'+
           '<span style="font-size:10px;color:var(--muted)">.jpg 사진 / .txt 노트 — 복수 가능</span>'+
           '<input type="file" id="importInp" accept="image/*,.heic,.heif,.txt,text/plain" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;">'+
         '</div>'+
       '</div>'+
-      '<button id="reMkrBtn" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px;">\uD83D\uDD04 \uC0AC\uC9C4 \uB9C8\uCEE4 \uB2E4\uC2DC \uADF8\uB9AC\uAE30</button>'+
+      '<button id="reMkrBtn" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px;">'+svgIc('refresh','width:18px;height:18px;vertical-align:-4px;margin-right:5px')+'사진 마커 다시 그리기</button>'+
       '<div style="border-top:1px solid var(--border);margin-bottom:4px"></div>'+
     '</div>'+
     '<div style="padding:10px 14px 14px">'+
-      '<button id="clrAll" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid var(--danger);background:transparent;color:var(--danger);font-size:14px;font-weight:600;cursor:pointer;">'+svgIc('trash','width:16px;height:16px;vertical-align:-3px;margin-right:6px')+'전체 초기화</button>'+
+      '<button id="clrAll" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid var(--danger);background:transparent;color:var(--danger);font-size:14px;font-weight:600;cursor:pointer;">'+svgIc('trash','width:18px;height:18px;vertical-align:-4px;margin-right:6px')+'전체 초기화</button>'+
     '</div>';
 
   document.getElementById('exportBtn').addEventListener('click', function(){ openExportSheet(); });
+  var _opt=document.getElementById('optBtn'); if(_opt) _opt.addEventListener('click', openOptionsSheet);
   var _reB=document.getElementById('reMkrBtn'); if(_reB) _reB.addEventListener('click', function(){ rebuildPhotoMarkers({toast:true}); closeAll(); });
   document.getElementById('importInp').addEventListener('change', function(e){
     if (!e.target.files||!e.target.files.length) return;
@@ -4526,7 +4631,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.35 · 2026-06-24 · sheet fits screen (svh), trim 더보기';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.48 · 2026-06-24 · slate slider fill (#7E93A8) applied to all option sliders';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
