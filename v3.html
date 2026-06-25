@@ -603,6 +603,9 @@ html,body{width:100%;height:100%;overflow:hidden;
 .tbtn{width:40px;height:40px;border-radius:50%;}
 .mc-north{width:40px;height:40px;border-radius:50%;}
 .top-rstack{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+/* 위치 버튼 로딩 스피너 (평면) */
+.loc-spin{display:inline-block;width:18px;height:18px;border:2.5px solid #d4dae1;border-top-color:var(--accent);border-radius:50%;animation:locspin .7s linear infinite;}
+@keyframes locspin{to{transform:rotate(360deg);}}
 /* 지도 선택 — 섹션 라벨(글로벌·VWorld) 네이비로 또렷하게 */
 .mg-sec{display:flex;align-items:center;gap:7px;font-family:inherit;font-size:12px;font-weight:700;
   color:var(--accent);letter-spacing:.02em;text-transform:none;padding:12px 2px 5px}
@@ -1405,13 +1408,13 @@ function showLocationHelp(reason) {
 }
 
 function requestLocation(btn) {
-  btn.textContent = '⏳';
+  btn.innerHTML = '<span class="loc-spin"></span>';
   locRequesting = true;
   startCompass();  // 방향 표시 활성화 (iOS 권한 요청 포함)
 
   navigator.geolocation.getCurrentPosition(
     function(pos) {
-      btn.textContent = '📍';
+      btn.innerHTML = '<svg class="svi" style="width:22px;height:22px"><use href="#ic-locate"></use></svg>';
       locRequesting = false;
       var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
       setLoc(lat, lng, acc);
@@ -1432,7 +1435,7 @@ function requestLocation(btn) {
       );
     },
     function(err) {
-      btn.textContent = '📍';
+      btn.innerHTML = '<svg class="svi" style="width:22px;height:22px"><use href="#ic-locate"></use></svg>';
       locRequesting = false;
       if (err.code === 1) {       // PERMISSION_DENIED
         toast('📍 위치 권한이 거부됨 — 브라우저 설정에서 허용 필요');
@@ -4631,7 +4634,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.48 · 2026-06-24 · slate slider fill (#7E93A8) applied to all option sliders';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.49 · 2026-06-24 · locate button: flat spinner + flat locate icon (no emoji)';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
