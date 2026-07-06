@@ -1561,6 +1561,9 @@ var POST_CJ = [{"id": "32", "addr": "흥덕구 신율로153번길 6", "manager":
 var BELL_CJ = [{"id": "1", "addr": "복대동 837", "manager": "재난대응과", "note": "C1-031 CCTV 지점 병설", "lat": 36.6322691, "lng": 127.446303}];
 var LIGHT_CJ = [{"id": "1", "addr": "복대동 1902번지 인근 (복대2동 전역 집계)", "type": "보안등 195 · 가로등 67", "count": "262", "time": "19:00~06:30", "manager": "흥덕구 건설과", "sec": 195, "st": 67, "lat": 36.6289051, "lng": 127.445166}];
 
+// ── 포항 북구 — 구역계 미확정: 잠정 지점(점데이터)으로 표시. 확정 폴리곤 수령 시 boundary_pn 링으로 교체 예정
+var BNDPT_PN = [{"id": 1, "lat": 36.0712115, "lng": 129.405739}, {"id": 2, "lat": 36.0719157, "lng": 129.4119634}, {"id": 3, "lat": 36.0622416, "lng": 129.3877673}];
+
 var REGIONS = [
   { id:'gangneung', name:'[경찰청]강원 강릉시', expanded:false,
     layers:['light_gn','cctv_gn','boundary_gn'],
@@ -1582,7 +1585,10 @@ var REGIONS = [
     center:[35.509427, 129.299815], zoom:16 },
   { id:'cheongju-bd', name:'청주 흥덕구 복대2동', expanded:false,
     layers:['vacant_cj','light_cj','cctv_cj','park_cj','post_cj','bell_cj','boundary_cj'],
-    center:[36.630199, 127.443976], zoom:16 }
+    center:[36.630199, 127.443976], zoom:16 },
+  { id:'pohang-buk', name:'포항 북구 (구역 검토중)', expanded:false,
+    layers:['bndpt_pn'],
+    center:[36.068456, 129.401823], zoom:15 }
 ];
 
 // 주제별 그룹 (지리 영역이 아님 — center 없음)
@@ -1637,6 +1643,8 @@ var LAYERS = {
   park_cj:     {id:'park_cj',     name:'공영주차장',      color:'#14b8a6',icon:'🅿',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'cheongju-bd'},
   post_cj:     {id:'post_cj',     name:'방범초소',        color:'#8b5cf6',icon:'🚨',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'cheongju-bd'},
   bell_cj:     {id:'bell_cj',     name:'비상벨',          color:'#ef4444',icon:'🔔',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'cheongju-bd'},
+  // ── 포항 북구 (구역계 미확정 — 잠정 지점)
+  bndpt_pn:    {id:'bndpt_pn',    name:'구역계 지점(잠정)', color:'#6366f1',icon:'🗂',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'pohang-buk'},
 };
 // 점 마커들이 위에 보이도록 safemap을 boundary 바로 앞(아래 레이어)에 배치
 var L_ORDER = ['survey','photo','cctv','light','vacant','boundary','safemap'];
@@ -2367,6 +2375,22 @@ function initBellCJ(){
       naviBtn(item.lat,item.lng,'비상벨')
     );});
     addMkr('bell_cj',m);
+  });
+}
+// ── 포항 북구 잠정 구역계 지점 (번호 마커)
+function initBndptPN(){
+  BNDPT_PN.forEach(function(p){
+    var ic = L.divIcon({html:'<div style="width:22px;height:22px;border-radius:50%;background:#6366f1;color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">'+p.id+'</div>',className:'',iconSize:[22,22],iconAnchor:[11,11]});
+    var m=L.marker([p.lat,p.lng],{icon:ic}).addTo(map);
+    m.on('click',function(){openInfo('🗂 구역계 지점 '+p.id,
+      '<div class="ic-ico" style="background:linear-gradient(135deg,#1e1b4b,#4338ca)">🗂</div>'+
+      '<div class="ic-name">구역계 잠정 지점 '+p.id+'번</div>'+
+      '<div class="ic-row"><div class="ic-k">지역</div><div class="ic-v">경북 포항 북구</div></div>'+
+      '<div class="ic-row"><div class="ic-k">상태</div><div class="ic-v">구역계 미확정 — 검토용 잠정 지점</div></div>'+
+      '<div class="ic-coords"><div>위도 <span>'+p.lat.toFixed(6)+'</span></div><div>경도 <span>'+p.lng.toFixed(6)+'</span></div></div>'+
+      naviBtn(p.lat,p.lng,'구역계 지점 '+p.id+'번')
+    );});
+    addMkr('bndpt_pn',m);
   });
 }
 // 청주 지오코딩 → 배치 (캐시 적중 시 즉시, 미적중 시 VWorld 순차 조회)
@@ -3495,6 +3519,7 @@ function getLayerData(lid) {
     case 'park_cj':     return PARK_CJ;
     case 'post_cj':     return POST_CJ;
     case 'bell_cj':     return BELL_CJ;
+    case 'bndpt_pn':    return BNDPT_PN;
     default:            return [];
   }
 }
@@ -3583,6 +3608,10 @@ function buildDataSheet() {
             name = '공영주차장 — ' + (item.addr||('#'+item.idx));
             sub = (item.spaces||'-') + (item.note?' · '+item.note:'');
             color = '#14b8a6';
+          } else if (lid.indexOf('bndpt')===0) {
+            name = '구역계 지점 ' + item.id + '번';
+            sub = '잠정 — 구역계 미확정';
+            color = '#6366f1';
           } else if (lid.indexOf('post')===0) {
             name = '방범초소 — ' + (item.addr||'');
             sub = (item.manager||'-') + (item.note?' · '+item.note:'');
@@ -4857,7 +4886,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.53 · 2026-07-06 · Cheongju CCTV: fixed geocoded coords (19)';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.54 · 2026-07-06 · add Pohang Buk-gu provisional boundary points';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
@@ -4868,6 +4897,7 @@ document.addEventListener('click', function(e) {
     initVacantBS(); initLightsBS(); initCctvBS();
     initLightsGN(); initCctvGN();
     initCctvUN(); initLightsUN(); initParkUN(); initPostUN(); initBellUN();
+    initBndptPN();
     Object.keys(LAYERS).forEach(function(id){ applyVis(id); });
     updCounts();
     initRegionCJ();   // 청주 복대2동 — 주소 지오코딩 후 비동기 배치
