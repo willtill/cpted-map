@@ -1024,6 +1024,62 @@ var curKey = _bk ? 'vw-base' : 'esri-street';
 var hybridBase = null;
 var vwKey = _bk;
 
+// ══ 주소 → 좌표 (VWorld 지오코딩 — 주소만 있는 지역 데이터를 실행 시 자동 배치) ══
+// 성공 좌표는 localStorage 'fgeo1'에 캐시 → 이후 실행은 API 호출 없이 즉시 표시
+var _fgeo = {};
+try { _fgeo = JSON.parse(localStorage.getItem('fgeo1')) || {}; } catch(_) {}
+function _fgeoSave(){ try { localStorage.setItem('fgeo1', JSON.stringify(_fgeo)); } catch(_) {} }
+async function fwdGeocode(addr, prefType) {
+  if (!addr || !vwKey) return null;
+  if (_fgeo[addr]) return _fgeo[addr];
+  var types = prefType === 'ROAD' ? ['ROAD','PARCEL'] : ['PARCEL','ROAD'];
+  for (var i = 0; i < types.length; i++) {
+    try {
+      var url = 'https://api.vworld.kr/req/address?service=address&request=getcoord&version=2.0' +
+        '&crs=epsg:4326&refine=true&simple=false&format=json' +
+        '&type=' + types[i] + '&address=' + encodeURIComponent(addr) + '&key=' + vwKey;
+      var resp = await fetch(url);
+      if (!resp.ok) continue;
+      var j = await resp.json();
+      var pt = j && j.response && j.response.status === 'OK' && j.response.result && j.response.result.point;
+      if (pt && pt.y && pt.x) {
+        var r = { lat: parseFloat(pt.y), lng: parseFloat(pt.x) };
+        _fgeo[addr] = r; _fgeoSave();
+        return r;
+      }
+    } catch(_) {}
+  }
+  // 2차: OSM Nominatim (VWorld가 브라우저 요청을 거부하거나 실패할 때)
+  try {
+    var url2 = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=kr' +
+      '&accept-language=ko&q=' + encodeURIComponent(addr);
+    var r2 = await fetch(url2, {headers:{'Accept':'application/json'}});
+    if (r2.ok) {
+      var a2 = await r2.json();
+      if (a2 && a2.length && a2[0].lat && a2[0].lon) {
+        var rr = { lat: parseFloat(a2[0].lat), lng: parseFloat(a2[0].lon) };
+        _fgeo[addr] = rr; _fgeoSave();
+        return rr;
+      }
+    }
+  } catch(_) {}
+  return null;
+}
+// 데이터셋의 미배치 항목(g 있음·lat 없음)을 순차 지오코딩 → true 반환 시 신규 배치 발생
+async function geocodeDataset(arr) {
+  var st = { ok: 0, fail: 0, net: 0 };   // net = 캐시 미적중으로 실제 API를 조회한 건수
+  for (var i = 0; i < arr.length; i++) {
+    var it = arr[i];
+    if (it.lat != null || !it.g) continue;
+    var cached = _fgeo[it.g];
+    if (!cached) st.net++;
+    var r = cached || await fwdGeocode(it.g, it.gt);
+    if (r) { it.lat = r.lat; it.lng = r.lng; st.ok++; }
+    else { st.fail++; console.warn('[지오코딩 실패]', it.g); }
+  }
+  return st;
+}
+
 // 좌표 → 한국 주소 (VWorld 우선, 실패 시 OSM Nominatim 폴백)
 var _addrCache = {};
 async function revGeocode(lat, lng) {
@@ -1495,6 +1551,16 @@ var PARK_UN = [{"idx": 1, "addr": "울산 남구 두왕동 564-3", "spaces": "8�
 var POST_UN = [{"id": "1", "addr": "울산 남구 무거동 495", "manager": "무거동 자율방범대", "note": "", "lat": 35.54321629766626, "lng": 129.26157678991322}, {"id": "3", "addr": "울산 남구 야음동 719-5", "manager": "수암동주민센터", "note": "", "lat": 35.52438419884265, "lng": 129.31844239749256}, {"id": "4", "addr": "울산 남구 야음동 675-4", "manager": "대현동행정복지센터", "note": "", "lat": 35.52652536396579, "lng": 129.32688560739246}, {"id": "5", "addr": "울산 남구 신정동 639-2", "manager": "신정1동행정복지센터", "note": "", "lat": 35.541392679909194, "lng": 129.3065349619517}, {"id": "6", "addr": "울산 남구 신정동 1210-9", "manager": "신정2동행정복지센터", "note": "", "lat": 35.534637930986676, "lng": 129.3078770049976}, {"id": "7", "addr": "울산 남구 신정동 294-4", "manager": "신정3동행정복지센터", "note": "", "lat": 35.54495754504089, "lng": 129.31635376324388}, {"id": "8", "addr": "울산 남구 신정동 880-9", "manager": "신정4동행정복지센터", "note": "", "lat": 35.529394198063244, "lng": 129.31445857781958}, {"id": "9", "addr": "울산 남구 신정동 80-23", "manager": "신정5동행정복지센터", "note": "", "lat": 35.54483905310475, "lng": 129.32140994629773}, {"id": "10", "addr": "울산 남구 옥동1402-6", "manager": "옥동행정복지센터", "note": "", "lat": 35.53517481110251, "lng": 129.29386316349746}, {"id": "11", "addr": "울산 남구 달동 864-3", "manager": "달동행정복지센터", "note": "", "lat": 35.53639246180771, "lng": 129.3165554806797}, {"id": "12", "addr": "울산 남구 야음동 925", "manager": "야음장생포동 행정복지센터", "note": "", "lat": 35.520030746220385, "lng": 129.33998994796303}, {"id": "13", "addr": "울산 남구 선암동 180-189", "manager": "선암동행정복지센터", "note": "", "lat": 35.51508106374605, "lng": 129.3382395143371}];
 var BELL_UN = [{"idx": 1, "lat": 35.5094353, "lng": 129.2983441}, {"idx": 2, "lat": 35.5071985, "lng": 129.3013778}, {"idx": 3, "lat": 35.5093304, "lng": 129.296376}, {"idx": 4, "lat": 35.5127554, "lng": 129.2951523}, {"idx": 5, "lat": 35.5133495, "lng": 129.2941434}, {"idx": 6, "lat": 35.5140485, "lng": 129.2973205}, {"idx": 7, "lat": 35.5150794, "lng": 129.2969126}, {"idx": 8, "lat": 35.5149921, "lng": 129.2973849}, {"idx": 9, "lat": 35.5144154, "lng": 129.2948947}];
 
+
+// ── 청주 흥덕구 복대2동 (주소 기반 — 좌표는 앱 실행 시 VWorld 지오코딩으로 자동 배치·캐시)
+var BOUNDARY_CJ = [[36.6273324, 127.4421044], [36.6273232, 127.4420758], [36.6273024, 127.4420136], [36.62729, 127.4419785], [36.6272567, 127.4418894], [36.6272059, 127.4417562], [36.6271578, 127.4416298], [36.6270962, 127.4414679], [36.6270436, 127.4413297], [36.6270692, 127.4412828], [36.6271704, 127.4412237], [36.6272003, 127.4412062], [36.6272417, 127.4411836], [36.6272932, 127.441159], [36.627352, 127.4411338], [36.6273953, 127.4411174], [36.6274361, 127.4411055], [36.6274587, 127.4410992], [36.6275032, 127.4410896], [36.6275483, 127.4410852], [36.6275925, 127.4410827], [36.6277274, 127.4410829], [36.6278625, 127.4410831], [36.6279977, 127.4410834], [36.628133, 127.4410836], [36.6282366, 127.4410837], [36.6283369, 127.4410836], [36.6284243, 127.4410835], [36.6285279, 127.4410834], [36.6286318, 127.4410832], [36.6287388, 127.4410855], [36.6287422, 127.4410855], [36.6288436, 127.441081], [36.6289607, 127.441076], [36.6290509, 127.441072], [36.6290978, 127.4411062], [36.6292195, 127.4411233], [36.6292457, 127.4410647], [36.6295365, 127.4410539], [36.6295906, 127.4410519], [36.6297695, 127.4410454], [36.6299478, 127.4410388], [36.6301226, 127.4410323], [36.6302973, 127.4410259], [36.6304774, 127.4410192], [36.6305314, 127.4410163], [36.6306851, 127.4410106], [36.6308429, 127.4410047], [36.6309983, 127.440999], [36.6311516, 127.4409934], [36.6312193, 127.4409868], [36.6314252, 127.4409797], [36.6315147, 127.4409766], [36.6316043, 127.4409734], [36.6317023, 127.44097], [36.6318003, 127.4409667], [36.6318982, 127.4409632], [36.6320001, 127.4409598], [36.632138, 127.440955], [36.6321921, 127.4409531], [36.6323566, 127.4409475], [36.6324069, 127.4409456], [36.6324885, 127.4409429], [36.6325881, 127.4409394], [36.6326578, 127.4410104], [36.6326616, 127.4410375], [36.6326762, 127.4411442], [36.6326866, 127.44122], [36.6326883, 127.4412278], [36.6326953, 127.441257], [36.632737, 127.4414335], [36.6327739, 127.44159], [36.6327817, 127.441623], [36.632786, 127.4416378], [36.6328463, 127.4418436], [36.6328525, 127.4418647], [36.6328939, 127.442006], [36.6329287, 127.4421247], [36.6329525, 127.4422057], [36.6329708, 127.4422682], [36.6331007, 127.4427116], [36.6331254, 127.4427958], [36.6331653, 127.442932], [36.6332602, 127.4432556], [36.6332803, 127.4433242], [36.6333118, 127.4434318], [36.6333668, 127.4436192], [36.6333852, 127.4436822], [36.6334285, 127.44383], [36.6335095, 127.444106], [36.6335157, 127.4441272], [36.6335229, 127.4441519], [36.63355, 127.4442674], [36.6335968, 127.444467], [36.633617, 127.444553], [36.6336372, 127.4446391], [36.6336569, 127.4447489], [36.6336821, 127.4448897], [36.6337083, 127.4450351], [36.6337258, 127.4451332], [36.6337324, 127.4451856], [36.6337642, 127.4454371], [36.6337722, 127.4455035], [36.6337972, 127.4457263], [36.6338116, 127.4458542], [36.6338273, 127.4459932], [36.633843, 127.4461321], [36.6338646, 127.4463245], [36.6338722, 127.4463917], [36.6338916, 127.4465647], [36.6339087, 127.4467174], [36.6339283, 127.4468919], [36.6339404, 127.4469985], [36.633962, 127.4471909], [36.6339716, 127.4472759], [36.6339835, 127.4473814], [36.6339873, 127.4474446], [36.6331261, 127.447426], [36.6330539, 127.4473599], [36.6327942, 127.4474246], [36.6327318, 127.4474402], [36.6326337, 127.4474609], [36.6325531, 127.4474741], [36.6324539, 127.4474869], [36.6323844, 127.4474906], [36.6323001, 127.4474926], [36.6322092, 127.4474898], [36.6321368, 127.4474851], [36.6320651, 127.4474771], [36.6319845, 127.4474638], [36.6319356, 127.4474544], [36.6317131, 127.4474014], [36.6312975, 127.4472962], [36.6312689, 127.447253], [36.6311977, 127.4472248], [36.6311632, 127.447263], [36.630973, 127.4472152], [36.6308566, 127.4471862], [36.6307448, 127.4471581], [36.6306924, 127.4471438], [36.6306325, 127.4471259], [36.6305869, 127.4471112], [36.6305342, 127.4470938], [36.6305081, 127.4470482], [36.6304534, 127.4470188], [36.6304169, 127.4470515], [36.6302658, 127.4469897], [36.6300632, 127.4469032], [36.630042, 127.4468505], [36.6299373, 127.446811], [36.6298995, 127.4468447], [36.629792, 127.446812], [36.6296785, 127.4467773], [36.6296521, 127.446728], [36.629599, 127.4467151], [36.6295591, 127.4467409], [36.6294492, 127.4467074], [36.6293354, 127.4466727], [36.6292103, 127.4466347], [36.6290899, 127.446598], [36.628969, 127.4465611], [36.6288481, 127.4465243], [36.628719, 127.4464849], [36.6286041, 127.44645], [36.6285774, 127.4463916], [36.6284665, 127.4463712], [36.6284254, 127.446395], [36.6283588, 127.4463749], [36.6282407, 127.446339], [36.6281225, 127.4463031], [36.6280938, 127.4462944], [36.6280228, 127.4462734], [36.6279524, 127.4462527], [36.6278536, 127.4462232], [36.6277389, 127.4461887], [36.6276303, 127.4461561], [36.6276025, 127.4461096], [36.6276568, 127.4458358], [36.6276847, 127.4456946], [36.6277032, 127.4455967], [36.6277108, 127.4455518], [36.6277166, 127.4455072], [36.6277204, 127.4454722], [36.6277236, 127.4454287], [36.627726, 127.4453836], [36.6277266, 127.445347], [36.6277263, 127.4453046], [36.6277241, 127.4452161], [36.6277203, 127.445065], [36.6277174, 127.4449504], [36.6277142, 127.4448215], [36.6277116, 127.4447107], [36.6277078, 127.4445565], [36.6277042, 127.4444014], [36.6277004, 127.4442473], [36.6276977, 127.4441322], [36.6276939, 127.4439627], [36.6276912, 127.4438644], [36.6276876, 127.4437315], [36.6276849, 127.4436382], [36.6276825, 127.4435987], [36.6276814, 127.4435817], [36.6276754, 127.443526], [36.6276673, 127.44347], [36.6276594, 127.4434264], [36.6276526, 127.4433938], [36.6276412, 127.4433444], [36.6276103, 127.4432205], [36.6275868, 127.443126], [36.6275539, 127.4429862], [36.627529, 127.4428843], [36.6274978, 127.4427569], [36.6274657, 127.4426254], [36.6274334, 127.4424938], [36.6274018, 127.4423646], [36.6273696, 127.4422328], [36.6273554, 127.4421815], [36.6273398, 127.4421283], [36.6273324, 127.4421044]];
+var CCTV_CJ = [{"id": "1", "loc": "C1-012", "addr": "복대동 997", "count": "3", "rotation": "회전1,고정2", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6302129, "lng": 127.4411201}, {"id": "2", "loc": "C1-097", "addr": "복대동 968", "count": "4", "rotation": "회전1,고정3", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6325924, "lng": 127.44396}, {"id": "3", "loc": "B0023", "addr": "복대동 1000", "count": "3", "rotation": "회전1.고정2", "purpose": "불법주정차단속", "manager": "청주시 교통정책과", "lat": 36.6307659, "lng": 127.4410995}, {"id": "4", "loc": "C3-101", "addr": "복대동 124-6", "count": "4", "rotation": "회전1,고정3", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6329258, "lng": 127.442968}, {"id": "5", "loc": "B0125", "addr": "복대동 966", "count": "3", "rotation": "회전1.고정2", "purpose": "불법주정차단속", "manager": "청주시 교통정책과", "lat": 36.6337171, "lng": 127.4443767}, {"id": "6", "loc": "C3-133", "addr": "복대동 128-5", "count": "5", "rotation": "회전1,고정4", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6331265, "lng": 127.4446115}, {"id": "7", "loc": "C3-067", "addr": "복대동 980-7", "count": "5", "rotation": "회전1,고정4", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6326071, "lng": 127.4450706}, {"id": "8", "loc": "C2-066", "addr": "복대동 161", "count": "2", "rotation": "회전1,고정1", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.633274, "lng": 127.4468621}, {"id": "9", "loc": "C2-014", "addr": "복대동 1353", "count": "2", "rotation": "회전1,고정1", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6321731, "lng": 127.4470126}, {"id": "10", "loc": "C1-031", "addr": "복대동 837", "count": "2", "rotation": "회전1,고정1", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6322691, "lng": 127.446303}, {"id": "11", "loc": "C1-050", "addr": "복대동 1138", "count": "3", "rotation": "고정3", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6290648, "lng": 127.4415568}, {"id": "12", "loc": "C3-161", "addr": "복대동 1088", "count": "5", "rotation": "회전1,고정4", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6304339, "lng": 127.4429293}, {"id": "13", "loc": "C2-008", "addr": "복대동 1987", "count": "1", "rotation": "회전1", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6276746, "lng": 127.4418873}, {"id": "14", "loc": "C3-221", "addr": "복대동 1963", "count": "4", "rotation": "고정4", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6284321, "lng": 127.4427816}, {"id": "15", "loc": "C1-045", "addr": "복대동 1902", "count": "2", "rotation": "회전2", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6289051, "lng": 127.445166}, {"id": "16", "loc": "C1-075", "addr": "복대동 2421", "count": "3", "rotation": "회전1,고정2", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6274177, "lng": 127.4426217}, {"id": "17", "loc": "C3-273", "addr": "복대동 2158", "count": "5", "rotation": "회전1,고정4", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6275182, "lng": 127.4456127}, {"id": "18", "loc": "C3-094", "addr": "복대동 1499", "count": "4", "rotation": "회전1,고정4", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6281989, "lng": 127.4462356}, {"id": "19", "loc": "C1-094", "addr": "복대동 1270", "count": "5", "rotation": "회전1,고정4", "purpose": "다목적", "manager": "청주시 재난대응과", "lat": 36.6300234, "lng": 127.4452455}];
+var VACANT_CJ = [{"id": "1", "addr": "복대동 126-2", "type": "단독주택", "grade": "2등급", "note": "", "lat": 36.6324747, "lng": 127.4438728}, {"id": "2", "addr": "복대동 694-8", "type": "단독주택", "grade": "2등급", "note": "", "lat": 36.6317057, "lng": 127.4480564}, {"id": "3", "addr": "복대동 769-5", "type": "단독주택", "grade": "2등급", "note": "", "lat": 36.6303732, "lng": 127.4435858}, {"id": "4", "addr": "복대동 776-7", "type": "단독주택", "grade": "2등급", "note": "", "lat": 36.6310585, "lng": 127.4434591}, {"id": "5", "addr": "복대동 856-2", "type": "단독주택", "grade": "2등급", "note": "", "lat": 36.6336824, "lng": 127.451677}, {"id": "6", "addr": "복대동 980-8", "type": "단독주택", "grade": "3등급", "note": "", "lat": 36.6326282, "lng": 127.4452294}, {"id": "7", "addr": "복대동 1827", "type": "다가구", "grade": "1등급", "note": "", "lat": 36.6278203, "lng": 127.4478356}, {"id": "8", "addr": "복대동 2043", "type": "그 외 주택", "grade": "1등급", "note": "", "lat": 36.6269913, "lng": 127.4438863}];
+var PARK_CJ = [{"idx": 1, "addr": "복대동 2229", "spaces": "4면", "note": "노외주차장", "lat": 36.6272614, "lng": 127.447014}, {"idx": 2, "addr": "풍산로 (복대동 1092 일원)", "spaces": "33면", "note": "노상주차장", "g": "충청북도 청주시 흥덕구 복대동 1092", "lat": null, "lng": null}, {"idx": 3, "addr": "신율로 (주택가 부근)", "spaces": "22면", "note": "노상주차장 — 위치정보(지번) 확인 필요", "lat": null, "lng": null}, {"idx": 4, "addr": "신율로 (성광아파트 부근)", "spaces": "36면", "note": "노상주차장 — 위치정보(지번) 확인 필요", "lat": null, "lng": null}];
+var POST_CJ = [{"id": "32", "addr": "흥덕구 신율로153번길 6", "manager": "복대2자율방범대", "note": "", "lat": 36.6315488, "lng": 127.4469703}];
+var BELL_CJ = [{"id": "1", "addr": "복대동 837", "manager": "재난대응과", "note": "C1-031 CCTV 지점 병설", "lat": 36.6322691, "lng": 127.446303}];
+var LIGHT_CJ = [{"id": "1", "addr": "복대동 1902번지 인근 (복대2동 전역 집계)", "type": "보안등 195 · 가로등 67", "count": "262", "time": "19:00~06:30", "manager": "흥덕구 건설과", "sec": 195, "st": 67, "lat": 36.6289051, "lng": 127.445166}];
+
 var REGIONS = [
   { id:'gangneung', name:'[경찰청]강원 강릉시', expanded:false,
     layers:['light_gn','cctv_gn','boundary_gn'],
@@ -1513,7 +1579,10 @@ var REGIONS = [
     center:[35.09248, 128.98057], zoom:16 },
   { id:'ulsan-namgu', name:'울산 남구 (두왕동)', expanded:false,
     layers:['cctv_un','light_un','park_un','post_un','bell_un','boundary_un'],
-    center:[35.509427, 129.299815], zoom:16 }
+    center:[35.509427, 129.299815], zoom:16 },
+  { id:'cheongju-bd', name:'청주 흥덕구 복대2동', expanded:false,
+    layers:['vacant_cj','light_cj','cctv_cj','park_cj','post_cj','bell_cj','boundary_cj'],
+    center:[36.630199, 127.443976], zoom:16 }
 ];
 
 // 주제별 그룹 (지리 영역이 아님 — center 없음)
@@ -1560,6 +1629,14 @@ var LAYERS = {
   bell_un:     {id:'bell_un',     name:'비상벨',         color:'#ef4444',icon:'🔔',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'ulsan-namgu'},
   light_gn:    {id:'light_gn',    name:'보안등',         color:'#f59e0b',icon:'💡',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'gangneung'},
   cctv_gn:     {id:'cctv_gn',     name:'CCTV',           color:'#3b82f6',icon:'📹',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'gangneung'},
+  // ── 청주 흥덕구 복대2동
+  boundary_cj: {id:'boundary_cj', name:'복대2동 경계',    color:'#6366f1',icon:'🗂',visible:true,opacity:.25,sz:1,weight:3.0,leaf:null,mkrs:[],cnt:0, region:'cheongju-bd'},
+  vacant_cj:   {id:'vacant_cj',   name:'빈집',           color:'#f97316',icon:'🏚',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'cheongju-bd'},
+  light_cj:    {id:'light_cj',    name:'가로등·보안등(집계)', color:'#f59e0b',icon:'💡',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'cheongju-bd'},
+  cctv_cj:     {id:'cctv_cj',     name:'CCTV',           color:'#3b82f6',icon:'📹',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'cheongju-bd'},
+  park_cj:     {id:'park_cj',     name:'공영주차장',      color:'#14b8a6',icon:'🅿',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'cheongju-bd'},
+  post_cj:     {id:'post_cj',     name:'방범초소',        color:'#8b5cf6',icon:'🚨',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'cheongju-bd'},
+  bell_cj:     {id:'bell_cj',     name:'비상벨',          color:'#ef4444',icon:'🔔',visible:true,opacity:1, sz:1,mkrs:[],cnt:0, region:'cheongju-bd'},
 };
 // 점 마커들이 위에 보이도록 safemap을 boundary 바로 앞(아래 레이어)에 배치
 var L_ORDER = ['survey','photo','cctv','light','vacant','boundary','safemap'];
@@ -1567,7 +1644,7 @@ var L_BASE  = {vacant:16, light:16, cctv:16, photo:42, survey:32, boundary:0};
 
 function applyVis(id) {
   var ly = LAYERS[id];
-  if (id==='boundary'||id==='boundary_smj'||id==='boundary_sj'||id==='boundary_bs'||id==='boundary_gn'||id==='boundary_un') { drawBoundaries(); return; }
+  if (id.indexOf('boundary')===0) { drawBoundaries(); return; }
   if (ly.wmsId && ly.wms) { ly.visible ? map.addLayer(ly.wms) : map.removeLayer(ly.wms); return; }
   if (id==='photo') { cullPhotoMarkers(); return; }   // 사진: 가시성+뷰포트 동시 반영
   ly.mkrs.forEach(function(m){ ly.visible ? map.addLayer(m) : map.removeLayer(m); });
@@ -1581,7 +1658,7 @@ function addMkr(id, m) {
 }
 function setLayerOp(id, v) {
   LAYERS[id].opacity = v;
-  if (id==='boundary'||id==='boundary_smj'||id==='boundary_sj'||id==='boundary_bs'||id==='boundary_gn'||id==='boundary_un') { drawBoundaries(); saveLayers(); return; }
+  if (id.indexOf('boundary')===0) { drawBoundaries(); saveLayers(); return; }
   if (LAYERS[id].wmsId && LAYERS[id].wms) { LAYERS[id].wms.setOpacity(v); saveLayers(); return; }
   LAYERS[id].mkrs.forEach(function(m){ var e=m.getElement(); if(e) e.style.opacity=v; });
   saveLayers();
@@ -1594,7 +1671,7 @@ function _baseSz(id){
 }
 function setLayerSz(id, v) {
   // 경계선: sz 슬라이더는 선 두께를 의미
-  if (id==='boundary' || id==='boundary_smj' || id==='boundary_sj' || id==='boundary_bs' || id==='boundary_gn' || id==='boundary_un') {
+  if (id.indexOf('boundary')===0) {
     LAYERS[id].weight = v;
     drawBoundaries();
     saveLayers(); return;
@@ -1821,14 +1898,16 @@ function bndRings(){
   LAYERS.boundary_bs.rings  = (typeof BOUNDARY_BS!=='undefined'  && BOUNDARY_BS.length)  ? [BOUNDARY_BS]  : [];
   LAYERS.boundary_gn.rings  = (typeof BOUNDARY_GN!=='undefined'  && BOUNDARY_GN.length)  ? [BOUNDARY_GN]  : [];
   LAYERS.boundary_un.rings  = (typeof BOUNDARY_UN!=='undefined'  && BOUNDARY_UN.length)  ? [BOUNDARY_UN]  : [];
+  LAYERS.boundary_cj.rings  = (typeof BOUNDARY_CJ!=='undefined'  && BOUNDARY_CJ.length)  ? [BOUNDARY_CJ]  : [];
   LAYERS.boundary.cnt = LAYERS.boundary.rings.length ? 1 : 0;
   LAYERS.boundary_smj.cnt = LAYERS.boundary_smj.rings.length ? 1 : 0;
   LAYERS.boundary_sj.cnt = LAYERS.boundary_sj.rings.length ? 1 : 0;
   LAYERS.boundary_bs.cnt = LAYERS.boundary_bs.rings.length ? 1 : 0;
   LAYERS.boundary_gn.cnt = LAYERS.boundary_gn.rings.length ? 1 : 0;
   LAYERS.boundary_un.cnt = LAYERS.boundary_un.rings.length ? 1 : 0;
+  LAYERS.boundary_cj.cnt = LAYERS.boundary_cj.rings.length ? 1 : 0;
   // 간소화(약 3m) + 경계별 bbox 계산(화면 밖 컬링용)
-  ['boundary','boundary_smj','boundary_sj','boundary_bs','boundary_gn','boundary_un'].forEach(function(id){
+  ['boundary','boundary_smj','boundary_sj','boundary_bs','boundary_gn','boundary_un','boundary_cj'].forEach(function(id){
     var ly = LAYERS[id];
     if (!ly.rings || !ly.rings.length) { ly._bbox = null; return; }
     ly.rings = ly.rings.map(function(r){ return simplifyRing(r, 0.00003); });
@@ -1857,7 +1936,7 @@ function initBoundary(){
   bndSvg.style.cssText = 'position:absolute;top:0;left:0;overflow:visible;';
   bndPaneEl.appendChild(bndSvg);
   // 경로 요소를 미리 만들어 재사용 (매번 DOM 재생성하지 않음 → 빠름)
-  ['boundary','boundary_smj','boundary_sj','boundary_bs','boundary_gn','boundary_un'].forEach(function(id){
+  ['boundary','boundary_smj','boundary_sj','boundary_bs','boundary_gn','boundary_un','boundary_cj'].forEach(function(id){
     var p = document.createElementNS(NS,'path');
     p.setAttribute('stroke-dasharray','6 4');
     p.setAttribute('stroke-linejoin','round');
@@ -1877,7 +1956,7 @@ function drawBoundaries(){
   if (!bndSvg) return;
   var view = null;
   try { view = map.getBounds().pad(0.3); } catch(_){}   // 회전 포함 현재 화면 범위(여유 30%)
-  ['boundary','boundary_smj','boundary_sj','boundary_bs','boundary_gn','boundary_un'].forEach(function(id){
+  ['boundary','boundary_smj','boundary_sj','boundary_bs','boundary_gn','boundary_un','boundary_cj'].forEach(function(id){
     var ly = LAYERS[id], path = _bndPaths[id];
     if (!path) return;
     if (!ly || !ly.visible || !ly.rings || !ly.rings.length) { path.setAttribute('d',''); return; }
@@ -2184,6 +2263,131 @@ function initBellUN(){
     );});
     addMkr('bell_un',m);
   });
+}
+
+// ── 청주 흥덕구 복대2동 초기화 (lat 없는 항목은 지오코딩 완료 후 재호출 시 배치)
+function initLightCJ(){
+  LIGHT_CJ.forEach(function(item){
+    if(item.lat==null || item._mk) return; item._mk=true;
+    var m=L.marker([item.lat,item.lng],{icon:ciIcon('#f59e0b','💡',16)}).addTo(map);
+    m.on('click',function(){openInfo('💡 가로등·보안등 (집계)',
+      '<div class="ic-ico" style="background:linear-gradient(135deg,#451a03,#78350f)">💡</div>'+
+      '<div class="ic-name">복대2동 전역 집계 — 기준점: 복대동 1902번지 인근</div>'+
+      '<div class="ic-row"><div class="ic-k">지역</div><div class="ic-v">청주 흥덕구 복대2동</div></div>'+
+      '<div class="ic-row"><div class="ic-k">보안등</div><div class="ic-v">'+item.sec+'등</div></div>'+
+      '<div class="ic-row"><div class="ic-k">가로등</div><div class="ic-v">'+item.st+'등</div></div>'+
+      '<div class="ic-row"><div class="ic-k">합계</div><div class="ic-v">'+item.count+'등</div></div>'+
+      '<div class="ic-row"><div class="ic-k">운영시간</div><div class="ic-v">'+(item.time||'-')+'</div></div>'+
+      '<div class="ic-row"><div class="ic-k">관리</div><div class="ic-v">'+(item.manager||'-')+'</div></div>'+
+      '<div class="ic-row"><div class="ic-k">비고</div><div class="ic-v">개별 위치 자료 미확보 — 동 단위 집계값</div></div>'+
+      '<div class="ic-coords"><div>위도 <span>'+item.lat.toFixed(6)+'</span></div><div>경도 <span>'+item.lng.toFixed(6)+'</span></div></div>'+
+      naviBtn(item.lat,item.lng,'가로등·보안등 집계 기준점')
+    );});
+    addMkr('light_cj',m);
+  });
+}
+function initVacantCJ(){
+  VACANT_CJ.forEach(function(h){
+    if(h.lat==null || h._mk) return; h._mk=true;
+    var m=L.marker([h.lat,h.lng],{icon:L.divIcon({html:'<div class="vh-pin">'+vhSvg(16)+'</div>',className:'',iconSize:[16,16],iconAnchor:[8,16]})}).addTo(map);
+    m.on('click',function(){openInfo('🏚 빈집 '+h.id,
+      '<div class="ic-ico" style="background:linear-gradient(135deg,#431407,#7c2d12)">🏚</div>'+
+      '<div class="ic-name">빈집 '+h.id+'번 — '+h.addr+'</div>'+
+      '<div class="ic-row"><div class="ic-k">지역</div><div class="ic-v">청주 흥덕구 복대2동</div></div>'+
+      '<div class="ic-row"><div class="ic-k">유형</div><div class="ic-v">'+(h.type||'-')+'</div></div>'+
+      '<div class="ic-row"><div class="ic-k">위험등급</div><div class="ic-v">'+(h.grade||'-')+'</div></div>'+
+      (h.note?'<div class="ic-row"><div class="ic-k">비고</div><div class="ic-v">'+h.note+'</div></div>':'')+
+      '<div class="ic-coords"><div>위도 <span>'+h.lat.toFixed(6)+'</span></div><div>경도 <span>'+h.lng.toFixed(6)+'</span></div></div>'+
+      naviBtn(h.lat,h.lng,'빈집 '+h.id+'번')
+    );});
+    addMkr('vacant_cj',m);
+  });
+}
+function initCctvCJ(){
+  CCTV_CJ.forEach(function(item){
+    if(item.lat==null || item._mk) return; item._mk=true;
+    var m=L.marker([item.lat,item.lng],{icon:ciIcon('#3b82f6','📹',16)}).addTo(map);
+    m.on('click',function(){openInfo('📹 '+item.addr,
+      '<div class="ic-ico" style="background:linear-gradient(135deg,#172554,#1e3a8a)">📹</div>'+
+      '<div class="ic-name">'+item.addr+(item.loc?' ('+item.loc+')':'')+'</div>'+
+      '<div class="ic-row"><div class="ic-k">지역</div><div class="ic-v">청주 흥덕구 복대2동</div></div>'+
+      '<div class="ic-row"><div class="ic-k">카메라</div><div class="ic-v">'+(item.count||'-')+'대 · '+(item.rotation||'-')+'</div></div>'+
+      '<div class="ic-row"><div class="ic-k">목적</div><div class="ic-v">'+(item.purpose||'-')+'</div></div>'+
+      '<div class="ic-row"><div class="ic-k">관리</div><div class="ic-v">'+(item.manager||'-')+'</div></div>'+
+      '<div class="ic-coords"><div>위도 <span>'+item.lat.toFixed(6)+'</span></div><div>경도 <span>'+item.lng.toFixed(6)+'</span></div></div>'+
+      naviBtn(item.lat,item.lng,item.addr)
+    );});
+    addMkr('cctv_cj',m);
+  });
+}
+function initParkCJ(){
+  PARK_CJ.forEach(function(item){
+    if(item.lat==null || item._mk) return; item._mk=true;
+    var ttl='공영주차장 — '+item.addr;
+    var m=L.marker([item.lat,item.lng],{icon:ciIcon('#14b8a6','🅿',16)}).addTo(map);
+    m.on('click',function(){openInfo('🅿 '+ttl,
+      '<div class="ic-ico" style="background:linear-gradient(135deg,#042f2e,#0f766e)">🅿</div>'+
+      '<div class="ic-name">'+ttl+'</div>'+
+      '<div class="ic-row"><div class="ic-k">지역</div><div class="ic-v">청주 흥덕구 복대2동</div></div>'+
+      '<div class="ic-row"><div class="ic-k">주차면수</div><div class="ic-v">'+(item.spaces||'-')+'</div></div>'+
+      (item.note?'<div class="ic-row"><div class="ic-k">비고</div><div class="ic-v">'+item.note+'</div></div>':'')+
+      '<div class="ic-coords"><div>위도 <span>'+item.lat.toFixed(6)+'</span></div><div>경도 <span>'+item.lng.toFixed(6)+'</span></div></div>'+
+      naviBtn(item.lat,item.lng,ttl)
+    );});
+    addMkr('park_cj',m);
+  });
+}
+function initPostCJ(){
+  POST_CJ.forEach(function(item){
+    if(item.lat==null || item._mk) return; item._mk=true;
+    var m=L.marker([item.lat,item.lng],{icon:ciIcon('#8b5cf6','🚨',16)}).addTo(map);
+    m.on('click',function(){openInfo('🚨 방범초소 — '+item.addr,
+      '<div class="ic-ico" style="background:linear-gradient(135deg,#2e1065,#6d28d9)">🚨</div>'+
+      '<div class="ic-name">'+item.addr+'</div>'+
+      '<div class="ic-row"><div class="ic-k">지역</div><div class="ic-v">청주 흥덕구 복대2동</div></div>'+
+      '<div class="ic-row"><div class="ic-k">관리</div><div class="ic-v">'+(item.manager||'-')+'</div></div>'+
+      (item.note?'<div class="ic-row"><div class="ic-k">비고</div><div class="ic-v">'+item.note+'</div></div>':'')+
+      '<div class="ic-coords"><div>위도 <span>'+item.lat.toFixed(6)+'</span></div><div>경도 <span>'+item.lng.toFixed(6)+'</span></div></div>'+
+      naviBtn(item.lat,item.lng,'방범초소')
+    );});
+    addMkr('post_cj',m);
+  });
+}
+function initBellCJ(){
+  BELL_CJ.forEach(function(item){
+    if(item.lat==null || item._mk) return; item._mk=true;
+    var m=L.marker([item.lat,item.lng],{icon:ciIcon('#ef4444','🔔',18)}).addTo(map);
+    m.on('click',function(){openInfo('🔔 비상벨 — '+item.addr,
+      '<div class="ic-ico" style="background:linear-gradient(135deg,#450a0a,#991b1b)">🔔</div>'+
+      '<div class="ic-name">'+item.addr+'</div>'+
+      '<div class="ic-row"><div class="ic-k">지역</div><div class="ic-v">청주 흥덕구 복대2동</div></div>'+
+      '<div class="ic-row"><div class="ic-k">관리</div><div class="ic-v">'+(item.manager||'-')+'</div></div>'+
+      (item.note?'<div class="ic-row"><div class="ic-k">비고</div><div class="ic-v">'+item.note+'</div></div>':'')+
+      '<div class="ic-coords"><div>위도 <span>'+item.lat.toFixed(6)+'</span></div><div>경도 <span>'+item.lng.toFixed(6)+'</span></div></div>'+
+      naviBtn(item.lat,item.lng,'비상벨')
+    );});
+    addMkr('bell_cj',m);
+  });
+}
+// 청주 지오코딩 → 배치 (캐시 적중 시 즉시, 미적중 시 VWorld 순차 조회)
+async function initRegionCJ(){
+  var sets = [[VACANT_CJ,initVacantCJ],[LIGHT_CJ,initLightCJ],[CCTV_CJ,initCctvCJ],[PARK_CJ,initParkCJ],[POST_CJ,initPostCJ],[BELL_CJ,initBellCJ]];
+  var tot = { ok:0, fail:0, net:0 };
+  for (var i=0;i<sets.length;i++){
+    try {
+      var st = await geocodeDataset(sets[i][0]);
+      if (st) { tot.ok+=st.ok; tot.fail+=st.fail; tot.net+=st.net; }
+    } catch(_){}
+    sets[i][1]();
+  }
+  ['vacant_cj','light_cj','cctv_cj','park_cj','post_cj','bell_cj'].forEach(function(id){ applyVis(id); });
+  updCounts();
+  // 실제 API 조회가 있었을 때만 결과 알림 (매 실행 반복 알림 방지 — 성공분은 캐시되어 다음부터 조용히 배치)
+  if (tot.net > 0) {
+    if (tot.fail > 0 && tot.ok === 0) toast('복대2동 주소 좌표 변환 실패 ('+tot.fail+'건) — 네트워크·접속 주소 확인 필요', 5000);
+    else if (tot.fail > 0) toast('복대2동 시설물 배치: '+tot.ok+'건 완료 · '+tot.fail+'건 실패', 5000);
+    else if (tot.ok > 0) toast('복대2동 시설물 '+tot.ok+'건 자동 배치 완료');
+  }
 }
 
 // ══ PHOTOS ══
@@ -3285,6 +3489,12 @@ function getLayerData(lid) {
     case 'park_un':     return PARK_UN;
     case 'post_un':     return POST_UN;
     case 'bell_un':     return BELL_UN;
+    case 'vacant_cj':   return VACANT_CJ;
+    case 'light_cj':    return LIGHT_CJ;
+    case 'cctv_cj':     return CCTV_CJ;
+    case 'park_cj':     return PARK_CJ;
+    case 'post_cj':     return POST_CJ;
+    case 'bell_cj':     return BELL_CJ;
     default:            return [];
   }
 }
@@ -3366,9 +3576,21 @@ function buildDataSheet() {
             sub = '카메라 ' + (item.count||'-') + '대' + (item.rotation?' · '+item.rotation:'') + (item.purpose?' · '+item.purpose:'');
             color = '#3b82f6';
           } else if (lid.indexOf('bell')===0) {
-            name = '비상벨 #' + item.id + ' — ' + item.addr;
+            name = '비상벨 #' + (item.id||item.idx) + ' — ' + (item.addr||'');
             sub = (item.manager||'-') + (item.note?' · '+item.note:'');
             color = '#ef4444';
+          } else if (lid.indexOf('park')===0) {
+            name = '공영주차장 — ' + (item.addr||('#'+item.idx));
+            sub = (item.spaces||'-') + (item.note?' · '+item.note:'');
+            color = '#14b8a6';
+          } else if (lid.indexOf('post')===0) {
+            name = '방범초소 — ' + (item.addr||'');
+            sub = (item.manager||'-') + (item.note?' · '+item.note:'');
+            color = '#8b5cf6';
+          } else {
+            name = item.addr || ('#'+(item.id||item.idx||'-'));
+            sub = item.note || '';
+            color = LAYERS[lid] ? LAYERS[lid].color : '#64748b';
           }
           var d = document.createElement('div');
           d.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 16px 10px 56px;cursor:pointer;border-top:1px solid var(--border);';
@@ -3381,6 +3603,7 @@ function buildDataSheet() {
           d.addEventListener('mouseenter', function(){ d.style.background='var(--p2)'; });
           d.addEventListener('mouseleave', function(){ d.style.background=''; });
           d.addEventListener('click', function(){
+            if (item.lat == null) { toast('위치 확인 전 항목입니다'); return; }
             map.flyTo([item.lat, item.lng], 18, {duration:.8});
             closeAll();
           });
@@ -3534,7 +3757,7 @@ function openLayerSheet(){
 // 단일 레이어 행 생성 (지역 내부에서도 사용)
 function makeLayerRow(id) {
   var ly = LAYERS[id];
-  var isBoundary = (id==='boundary' || id==='boundary_smj' || id==='boundary_un');
+  var isBoundary = (id.indexOf('boundary')===0);
   var isWms = !!ly.wmsId;
   var hasSz = !isBoundary && !isWms;
   var row = document.createElement('div'); row.className='lp-row';
@@ -4634,7 +4857,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.49 · 2026-06-24 · locate button: flat spinner + flat locate icon (no emoji)';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.53 · 2026-07-06 · Cheongju CCTV: fixed geocoded coords (19)';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
@@ -4647,6 +4870,7 @@ document.addEventListener('click', function(e) {
     initCctvUN(); initLightsUN(); initParkUN(); initPostUN(); initBellUN();
     Object.keys(LAYERS).forEach(function(id){ applyVis(id); });
     updCounts();
+    initRegionCJ();   // 청주 복대2동 — 주소 지오코딩 후 비동기 배치
   });
 
   // Restore tile
