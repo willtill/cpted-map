@@ -1651,6 +1651,8 @@ function setLayerOp(id, v) {
 function _baseSz(id){
   if(L_BASE[id]!=null) return L_BASE[id];
   if(id.indexOf('bell')===0) return 18;
+  if(id==='lnew_cjn') return 18;   // 청주 보안등 신설(네모) — 조치원 전자게시판과 동일
+  if(id.indexOf('_cjn')>0) return 16;   // 청주 점형 시설
   if(id.indexOf('vacant')===0||id.indexOf('light')===0||id.indexOf('cctv')===0||id.indexOf('park')===0||id.indexOf('post')===0) return 16;
   return 20;
 }
@@ -1675,6 +1677,12 @@ function setLayerSz(id, v) {
     else if (id.indexOf('post')===0)   ico = ciIcon(LAYERS[id].color,'🚨',sz);
     else if (id==='survey') ico = svIcon(m._sv, sz);
     else if (id==='photo')  ico = pinIcon(m._pd||'', sz, m._heading);
+    else if (id.indexOf('_cjn')>0) {   // 청주: sym 기반 마커 — 모양/다크 처리 유지하며 크기만 조절
+      var _ly = LAYERS[id];
+      if (id==='lnew_cjn')                         ico = _cjnSquareIcon(_ly.color, _ly.sym, sz);
+      else if (id==='fluor_cjn' || id==='walk_cjn')ico = _cjnDarkIcon(_ly.color, _ly.sym, sz);
+      else                                          ico = ciIcon(_ly.color, _ly.sym, sz);
+    }
     if (ico) m.setIcon(ico);
   });
   saveLayers();
@@ -5159,7 +5167,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.73 · 2026-07-07 · Cheongju: women safe-return path to deep yellow (귀갓길 convention)';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.74 · 2026-07-07 · Cheongju size-slider support + iOS review (culling/memory verified)';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
