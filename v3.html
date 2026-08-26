@@ -2590,9 +2590,7 @@ function initCJN(){
   // 옹벽 개선 — 점선 선형
   var lw = LAYERS['wall_cjn'];
   WALL_CJN.forEach(function(it){
-    var pl = L.polyline(it.path, {color:lw.color, weight:5, opacity:1, dashArray:'10,6'});
-    pl._isLine = true; pl._wBase = 5; pl.addTo(map);
-    pl.on('click', function(){openInfo('🧱 '+it.addr,
+    var _openWall = function(){ openInfo('🧱 '+it.addr,
       '<div class="ic-ico" style="background:'+lw.color+'">🧱</div>'+
       '<div class="ic-name">'+it.addr+'</div>'+
       '<div class="ic-row"><div class="ic-k">지역</div><div class="ic-v">청주시 남주동·석교동</div></div>'+
@@ -2601,7 +2599,16 @@ function initCJN(){
       '<div class="ic-row"><div class="ic-k">비고</div><div class="ic-v">2022 청주 남주동·석교동 CPTED 사업 — 성과분석 대상</div></div>'+
       '<div class="ic-coords"><div>위도 <span>'+it.lat.toFixed(6)+'</span></div><div>경도 <span>'+it.lng.toFixed(6)+'</span></div></div>'+
       naviBtn(it.lat, it.lng, it.addr)
-    );});
+    ); };
+    // 투명 굵은 히트 라인 — 손가락 터치 영역 확대 (가시 선 아래에 먼저 깔아 클릭 수신)
+    var hit = L.polyline(it.path, {color:'#000', weight:22, opacity:0, lineCap:'round'});
+    hit._isLine = true; hit._wBase = 22; hit.addTo(map);
+    hit.on('click', _openWall);
+    addMkr('wall_cjn', hit);
+    // 가시 선 (주황 점선) — 표시 담당
+    var pl = L.polyline(it.path, {color:lw.color, weight:5, opacity:1, dashArray:'10,6'});
+    pl._isLine = true; pl._wBase = 5; pl.addTo(map);
+    pl.on('click', _openWall);
     addMkr('wall_cjn', pl);
   });
   lw.cnt = WALL_CJN.length;
@@ -5167,7 +5174,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.74 · 2026-07-07 · Cheongju size-slider support + iOS review (culling/memory verified)';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.75 · 2026-07-07 · wall touch: invisible 22px hit-line widens tap target';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
