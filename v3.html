@@ -2028,6 +2028,8 @@ function simplifyRing(ring, tol){
   out.push(ring[ring.length-1]);
   return out;
 }
+// 합성동 서쪽 제외 부지: 원본 내부 경계 1·2번 + 바깥 경계 연결.
+var HAP_WEST_SCHOOL_RING = [[35.24359546404506,128.57956643130714],[35.243724594,128.580081832],[35.243897907,128.580024935],[35.243968831,128.580226611],[35.244031321,128.580748153],[35.243258823,128.581133208],[35.24309742492964,128.58051694957632],[35.243083541,128.580522401],[35.242971112,128.580556577],[35.242918859,128.580326761],[35.243035993,128.580298175],[35.24303974231789,128.58029670285768],[35.243012235,128.580191673],[35.242815377,128.58021501],[35.24274016,128.580148019],[35.24306792,128.579995034],[35.24343743,128.579690362],[35.24359546404506,128.57956643130714]];
 function bndRings(){
   // 청림동(geoJSON): coordinates [[[lng,lat],...]] → [[lat,lng],...]
   try {
@@ -2069,6 +2071,7 @@ function bndRings(){
   // 닫힌 학교 경계는 evenodd 채움의 구멍으로, 열린 경계는 선으로만 그린다.
   LAYERS.hs_19.openBoundaryLines=[];
   HAP_DATA.hs_20.features.forEach(function(it){
+    if(it.id===1||it.id===2)return; // 서쪽 제외 부지의 닫힌 경계에 통합
     var lines=it.geometry.type==='MultiLineString'?it.geometry.coordinates:[it.geometry.coordinates];
     lines.forEach(function(line){
       var first=line[0],last=line[line.length-1];
@@ -2077,6 +2080,7 @@ function bndRings(){
       else LAYERS.hs_19.openBoundaryLines.push(points);
     });
   });
+  LAYERS.hs_19.rings.push(HAP_WEST_SCHOOL_RING);
   LAYERS.hs_19.cnt=HAP_DATA.hs_19.features.length;
   // 간소화(약 3m) + 경계별 bbox 계산(화면 밖 컬링용)
   ['boundary','boundary_smj','boundary_sj','boundary_bs','boundary_gn','boundary_un','boundary_cj','boundary_jc','boundary_cjn','boundary_am','hs_19'].forEach(function(id){
@@ -5963,7 +5967,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.82 · 2026-10-02 · 합성동 학교 제외 구역계 수정';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.83 · 2026-10-02 · 합성동 서쪽 부지 채움 제외';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
