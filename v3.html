@@ -1021,7 +1021,7 @@ async function fwdGeocode(addr, prefType) {
   for (var i = 0; i < types.length; i++) {
     try {
       var url = PROXY + '/geocode?type=' + types[i] + '&address=' + encodeURIComponent(addr);
-      var resp = await fetch(url);
+      var resp = await fetchVWorldJson(url);
       if (!resp.ok) continue;
       var j = await resp.json();
       var pt = j && j.response && j.response.status === 'OK' && j.response.result && j.response.result.point;
@@ -1074,7 +1074,7 @@ async function revGeocode(lat, lng) {
   if (PROXY) {
     try {
       var url1 = PROXY + '/reverse?lat=' + lat + '&lng=' + lng;
-      var resp = await fetch(url1);
+      var resp = await fetchVWorldJson(url1);
       if (resp.ok) {
         var j = await resp.json();
         if (j && j.response && j.response.status === 'OK' && j.response.result && j.response.result.length) {
@@ -1129,17 +1129,37 @@ var curTile = (PROXY
   : TILES['esri-street']
 ).addTo(map);
 
+async function fetchVWorldJson(url) {
+  for (var attempt = 0; attempt < 5; attempt++) {
+    try {
+      var response = await fetch(url + '&_retry=' + attempt);
+      if (response.status < 500 || attempt === 4) return response;
+    } catch (error) { if (attempt === 4) throw error; }
+    await new Promise(function(resolve) { setTimeout(resolve, 250); });
+  }
+}
 function vwUrl(t, e) {
   var base = PROXY + '/wmts/' + t + '/{z}/{y}/{x}.' + (e||'png');
   var layer = L.tileLayer(base, {maxZoom:19, crossOrigin:true, keepBuffer:4, updateWhenIdle:false, className:'basemap'});
-  layer.on('tileerror', function() {
-    // 타일 오류 처리 이후 전환하고, 이미 제거된 레이어의 늦은 오류는 무시한다.
-    setTimeout(function() {
-      if (layer !== curTile && layer !== hybridBase) return;
-      var fallback = 'esri-sat';
-      setTile(fallback);
-      toast('VWorld 지도를 불러오지 못해 위성 지도로 전환했습니다.');
-    }, 0);
+  layer.createTile = function(coords, done) {
+    var tile = document.createElement('img');
+    var url = this.getTileUrl(coords), attempt = 0;
+    tile.alt = ''; tile.crossOrigin = '';
+    tile.setAttribute('role', 'presentation');
+    tile.onload = function() { done(null, tile); };
+    tile.onerror = function(error) {
+      if (attempt >= 7) { done(error, tile); return; }
+      attempt++;
+      tile._vwRetry = setTimeout(function() {
+        tile.src = url + '?_retry=' + attempt;
+      }, 250 * attempt);
+    };
+    tile.src = url;
+    return tile;
+  };
+  layer.on('tileunload', function(event) {
+    clearTimeout(event.tile._vwRetry);
+    event.tile.onload = event.tile.onerror = null;
   });
   return layer;
 }
