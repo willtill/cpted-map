@@ -1692,18 +1692,76 @@ var LAYERS = {
 };
 // 점 마커들이 위에 보이도록 safemap을 boundary 바로 앞(아래 레이어)에 배치
 Object.assign(LAYERS,{"hs_01":{"id":"hs_01","name":"CCTV 신설","color":"#f68c17","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"01 주거지 안전강화","info":""},"hs_03":{"id":"hs_03","name":"비상벨 설치","color":"#232323","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"01 주거지 안전강화","info":""},"hs_04":{"id":"hs_04","name":"보안등 신설","color":"#fff477","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"01 주거지 안전강화","info":""},"hs_08":{"id":"hs_08","name":"주택 방범모듈","color":"#424242","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"01 주거지 안전강화","info":""},"hs_17":{"id":"hs_17","name":"골목길 불밝히기","color":"#95c833","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"01 주거지 안전강화","info":"원본 9건 중 도형 없는 1건 제외"},"hs_05":{"id":"hs_05","name":"불법주정차 단속 CCTV","color":"#76366b","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"02 어린이 보행안전","info":""},"hs_10":{"id":"hs_10","name":"주요통학로 안심라인","color":"#ffb33d","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"02 어린이 보행안전","info":""},"hs_11":{"id":"hs_11","name":"도로다이어트","color":"#00a99c","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"02 어린이 보행안전","info":""},"hs_12":{"id":"hs_12","name":"안심놀이공간","color":"#e98400","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"02 어린이 보행안전","info":""},"hs_13":{"id":"hs_13","name":"골목놀이터 조명","color":"#f2e600","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"02 어린이 보행안전","info":""},"hs_15":{"id":"hs_15","name":"어린이공원 정비","color":"#4c684c","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"02 어린이 보행안전","info":""},"hs_06":{"id":"hs_06","name":"고보조명 설치","color":"#d92735","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"03 영역성 강화","info":""},"hs_07":{"id":"hs_07","name":"셉테드사업 안내판","color":"#ffffff","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"03 영역성 강화","info":""},"hs_09":{"id":"hs_09","name":"셔터 안전 그래픽","color":"#696969","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"03 영역성 강화","info":""},"hs_14":{"id":"hs_14","name":"방음벽 경관조명","color":"#b80093","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"04 철로변 조도개선","info":""},"hs_16":{"id":"hs_16","name":"지하도 환경개선","color":"#777077","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"04 철로변 조도개선","info":""},"hs_18":{"id":"hs_18","name":"가로수 수목정비·전신주 스마트 조명","color":"#794273","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"04 철로변 조도개선","info":""},"hs_02":{"id":"hs_02","name":"노후 CCTV 점검·기존 CCTV 표식","color":"#333333","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"05 경계·기존시설","info":""},"hs_19":{"id":"hs_19","name":"계획 대상지 구역계","color":"#ee1616","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"05 경계·기존시설","info":""},"hs_20":{"id":"hs_20","name":"계획도 내부 구분선","color":"#ee1616","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"05 경계·기존시설","info":""},"hs_21":{"id":"hs_21","name":"기존 가로등 및 보안등","color":"#333333","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"05 경계·기존시설","info":""}});
+// 신규 사례 구역계도 기존 사이트의 공통 구역계 스타일·전용 렌더러를 사용한다.
+['boundary_am','hs_19'].forEach(function(id){Object.assign(LAYERS[id],{color:'#6366f1',strokeColor:'#6366f1',strokeOpacity:.95,dashArray:'6 4',opacity:.25,weight:3,sz:1,icon:'🗂',boundaryStyleVersion:1});});
+function isBoundaryLayer(id){return id.indexOf('boundary')===0 || id==='hs_19';}
+// 표시 이름과 기호만 통일한다. 레이어 ID·원본 도형·현장기록 키는 유지한다.
+var CASE_LABELS={
+  'busan-ami':{year:2017,place:'부산 서구 아미동'},
+  'jochiwon':{year:2019,place:'세종 조치원읍'},
+  'cheongju-nj':{year:2022,place:'청주 남주동·석교동'},
+  'changwon-hapseong':{year:null,place:'창원 마산회원구 합성동'},
+  'gangneung':{year:null,place:'강릉시'},
+  'pohang-nam':{year:null,place:'포항 남구 청림동'},
+  'miryang-smj':{year:null,place:'밀양 삼랑진읍'},
+  'seongju-sj':{year:null,place:'성주 성주읍'},
+  'busan-saha':{year:null,place:'부산 사하구 신평동'},
+  'ulsan-namgu':{year:null,place:'울산 남구 두왕동'},
+  'cheongju-bd':{year:null,place:'청주 흥덕구 복대2동'},
+  'pohang-buk':{year:null,place:'포항 북구'}
+};
+REGIONS.forEach(function(r){var c=CASE_LABELS[r.id];if(c){r.sourceName=r.name;r.year=c.year;r.name='[성과분석] '+(c.year||'연도미확인')+'_'+c.place;}});
+var ELEMENT_FAMILIES={
+  cctv:{color:'#3b82f6',sym:'cctv',size:16},
+  light:{color:'#f59e0b',sym:'light',size:16},
+  bell:{color:'#ef4444',sym:'bell',size:18},
+  guide:{color:'#9333ea',sym:'map',size:18},
+  safeLine:{color:'#eab308',sym:'shield',size:16,line:{weight:4,dashArray:'6 4',lineCap:'round'}},
+  fence:{color:'#06b6d4',sym:'lock',line:{weight:4,dashArray:'2 6',lineCap:'round'}},
+  parking:{color:'#14b8a6',sym:'parking',size:16},
+  post:{color:'#8b5cf6',sym:'post',size:16}
+};
+function setElementFamily(id,family,name,point){
+  var ly=LAYERS[id],f=ELEMENT_FAMILIES[family];if(!ly||!f)return;
+  ly.sourceName=ly.name;ly.name=name;ly.elementFamily=family;ly.unifiedPoint=!!point;ly.color=f.color;ly.sym=f.sym;
+}
+Object.keys(LAYERS).forEach(function(id){
+  if(isBoundaryLayer(id)){LAYERS[id].sourceName=LAYERS[id].name;LAYERS[id].name='대상지 구역계';return;}
+  if(id.indexOf('cctv')===0)setElementFamily(id,'cctv','CCTV (기존)',true);
+  if(id.indexOf('light')===0)setElementFamily(id,'light','가로등·보안등 (기존)',true);
+  if(id.indexOf('bell')===0)setElementFamily(id,'bell','비상벨 (기존)',true);
+  if(id.indexOf('park')===0)setElementFamily(id,'parking','공영주차장',true);
+  if(id.indexOf('post')===0)setElementFamily(id,'post',id==='post_un'?'방범초소 (남구 전역)':'방범초소',true);
+  if(id.indexOf('vacant')===0)LAYERS[id].name='빈집·공폐가';
+});
+[
+  ['hs_01','cctv','CCTV (신설)',true],['hs_02','cctv','CCTV (기존·점검)',true],['hs_05','cctv','CCTV (불법주정차 단속)',true],
+  ['hs_03','bell','비상벨 (신설)',true],['hs_04','light','보안등 (신설)',true],['hs_21','light','가로등·보안등 (기존)',true],
+  ['lnew_cjn','light','보안등 (신설)',true],['lrep_cjn','light','보안등 (교체)',true],['hs_06','light','조명 (고보조명)',true],
+  ['vmap_jc','guide','안내판 (마을지도)',true],['board_jc','guide','안내판 (전자게시판)',true],['board_cjn','guide','안내판 (종합안내)',true],['hs_07','guide','안내판 (사업안내)',true],
+  ['aline_jc','safeLine','안심라인',false],['aline1_am','safeLine','안심라인 (야광페인트 1)',false],['aline2_am','safeLine','안심라인 (야광페인트 2)',false],['hs_10','safeLine','안심라인 (주요 통학로)',false],
+  ['fence_jc','fence','안전펜스 (조명 포함)',false],['fence_am','fence','안전펜스 (담장)',false]
+].forEach(function(a){setElementFamily.apply(null,a);});
+function unifiedPointIcon(id,scale){var ly=LAYERS[id],f=ELEMENT_FAMILIES[ly.elementFamily];return ciIcon(f.color,f.sym,Math.round(f.size*(scale||1)));}
+function applyUnifiedElement(id,m){
+  var ly=LAYERS[id],f=ELEMENT_FAMILIES[ly.elementFamily];if(!f)return;
+  if(ly.unifiedPoint&&m.setIcon){m.setIcon(unifiedPointIcon(id,ly.sz));return;}
+  if(f.line&&m._isLine&&m.setStyle){m._wBase=f.line.weight;m.setStyle(Object.assign({},f.line,{color:f.color,weight:f.line.weight*ly.sz}));}
+}
+
 var L_ORDER = ['survey','photo','cctv','light','vacant','boundary','safemap'];
 var L_BASE  = {vacant:16, light:16, cctv:16, photo:42, survey:32, boundary:0};
 
 function applyVis(id) {
   var ly = LAYERS[id];
-  if (id.indexOf('boundary')===0) { drawBoundaries(); return; }
+  if (isBoundaryLayer(id)) { drawBoundaries(); return; }
   if (ly.wmsId && ly.wms) { ly.visible ? map.addLayer(ly.wms) : map.removeLayer(ly.wms); return; }
   if (id==='photo') { cullPhotoMarkers(); return; }   // 사진: 가시성+뷰포트 동시 반영
   ly.mkrs.forEach(function(m){ (ly.visible && !ly._culled) ? map.addLayer(m) : map.removeLayer(m); });
 }
 function addMkr(id, m) {
   var ly = LAYERS[id];
+  applyUnifiedElement(id,m);
   ly.mkrs.push(m); ly.cnt = ly.mkrs.length;
   if (!ly.visible) map.removeLayer(m);
   var setOp = function(){ var e=m.getElement(); if(e) e.style.opacity=ly.opacity; };
@@ -1711,7 +1769,7 @@ function addMkr(id, m) {
 }
 function setLayerOp(id, v) {
   LAYERS[id].opacity = v;
-  if (id.indexOf('boundary')===0) { drawBoundaries(); saveLayers(); return; }
+  if (isBoundaryLayer(id)) { drawBoundaries(); saveLayers(); return; }
   if (LAYERS[id].wmsId && LAYERS[id].wms) { LAYERS[id].wms.setOpacity(v); saveLayers(); return; }
   LAYERS[id].mkrs.forEach(function(m){ var e=m.getElement(); if(e) e.style.opacity=v; });
   saveLayers();
@@ -1726,7 +1784,7 @@ function _baseSz(id){
 }
 function setLayerSz(id, v) {
   // 경계선: sz 슬라이더는 선 두께를 의미
-  if (id.indexOf('boundary')===0) {
+  if (isBoundaryLayer(id)) {
     LAYERS[id].weight = v;
     drawBoundaries();
     saveLayers(); return;
@@ -1734,6 +1792,7 @@ function setLayerSz(id, v) {
   LAYERS[id].sz = v;
   var base = _baseSz(id), sz = Math.round(base*v);
   LAYERS[id].mkrs.forEach(function(m){
+    if(LAYERS[id].unifiedPoint && m.setIcon){m.setIcon(unifiedPointIcon(id,v));return;}
     if (m._isLine) { m.setStyle({weight: Math.max(1, Math.round((m._wBase||4)*v))}); return; }   // 선형: 두께 배율
     if (m.setRadius) { if (m._rBase) m.setRadius(Math.max(1.5, m._rBase*v)); return; }             // 벡터 원: 반경 배율
     var ico;
@@ -1758,12 +1817,18 @@ function setLayerSz(id, v) {
 }
 function saveLayers() {
   var s={};
-  Object.keys(LAYERS).forEach(function(k){s[k]={visible:LAYERS[k].visible,opacity:LAYERS[k].opacity,sz:LAYERS[k].sz,weight:LAYERS[k].weight};});
+  Object.keys(LAYERS).forEach(function(k){s[k]={visible:LAYERS[k].visible,opacity:LAYERS[k].opacity,sz:LAYERS[k].sz,weight:LAYERS[k].weight,boundaryStyleVersion:LAYERS[k].boundaryStyleVersion};});
   lsSave('ly4', s);
 }
 function loadLayers() {
   var s = lsLoad('ly4', null); if (!s) return;
-  Object.keys(s).forEach(function(k){if(LAYERS[k]){LAYERS[k].visible=s[k].visible;LAYERS[k].opacity=s[k].opacity;LAYERS[k].sz=s[k].sz||1;if(s[k].weight)LAYERS[k].weight=s[k].weight;}});
+  Object.keys(s).forEach(function(k){
+    if(!LAYERS[k])return;
+    LAYERS[k].visible=s[k].visible;
+    // 기존 QGIS 스타일로 저장했던 값은 새 공통 스타일 기본값으로 전환한다.
+    if((k==='boundary_am'||k==='hs_19') && s[k].boundaryStyleVersion!==1)return;
+    LAYERS[k].opacity=s[k].opacity;LAYERS[k].sz=s[k].sz||1;if(s[k].weight)LAYERS[k].weight=s[k].weight;
+  });
 }
 
 // ══ SAFEMAP WMS (범죄주의구간 — 5종) ══
@@ -1993,11 +2058,17 @@ function bndRings(){
     }); });
   });
   LAYERS.boundary_am.cnt = AMI_DATA.boundary_am.features.length;
+  LAYERS.hs_19.rings=[];
+  HAP_DATA.hs_19.features.forEach(function(it){
+    var polygons=it.geometry.type==='MultiPolygon'?it.geometry.coordinates:[it.geometry.coordinates];
+    polygons.forEach(function(poly){poly.forEach(function(ring){LAYERS.hs_19.rings.push(ring.map(function(c){return [c[1],c[0]];}));});});
+  });
+  LAYERS.hs_19.cnt=HAP_DATA.hs_19.features.length;
   // 간소화(약 3m) + 경계별 bbox 계산(화면 밖 컬링용)
-  ['boundary','boundary_smj','boundary_sj','boundary_bs','boundary_gn','boundary_un','boundary_cj','boundary_jc','boundary_cjn','boundary_am'].forEach(function(id){
+  ['boundary','boundary_smj','boundary_sj','boundary_bs','boundary_gn','boundary_un','boundary_cj','boundary_jc','boundary_cjn','boundary_am','hs_19'].forEach(function(id){
     var ly = LAYERS[id];
     if (!ly.rings || !ly.rings.length) { ly._bbox = null; return; }
-    if(id!=='boundary_am') ly.rings = ly.rings.map(function(r){ return simplifyRing(r, 0.00003); });
+    if(id!=='boundary_am' && id!=='hs_19') ly.rings = ly.rings.map(function(r){ return simplifyRing(r, 0.00003); });
     var b = L.latLngBounds();
     ly.rings.forEach(function(r){ r.forEach(function(ll){ b.extend(ll); }); });
     ly._bbox = b.isValid() ? b : null;
@@ -2023,7 +2094,7 @@ function initBoundary(){
   bndSvg.style.cssText = 'position:absolute;top:0;left:0;overflow:visible;';
   bndPaneEl.appendChild(bndSvg);
   // 경로 요소를 미리 만들어 재사용 (매번 DOM 재생성하지 않음 → 빠름)
-  ['boundary','boundary_smj','boundary_sj','boundary_bs','boundary_gn','boundary_un','boundary_cj','boundary_jc','boundary_cjn','boundary_am'].forEach(function(id){
+  ['boundary','boundary_smj','boundary_sj','boundary_bs','boundary_gn','boundary_un','boundary_cj','boundary_jc','boundary_cjn','boundary_am','hs_19'].forEach(function(id){
     var p = document.createElementNS(NS,'path');
     p.setAttribute('stroke-dasharray',LAYERS[id].dashArray!=null ? LAYERS[id].dashArray : '6 4');
     p.setAttribute('fill-rule','evenodd');
@@ -2046,7 +2117,7 @@ function drawBoundaries(){
   if (!bndSvg) return;
   var view = null;
   try { view = map.getBounds().pad(0.3); } catch(_){}   // 회전 포함 현재 화면 범위(여유 30%)
-  ['boundary','boundary_smj','boundary_sj','boundary_bs','boundary_gn','boundary_un','boundary_cj','boundary_jc','boundary_cjn','boundary_am'].forEach(function(id){
+  ['boundary','boundary_smj','boundary_sj','boundary_bs','boundary_gn','boundary_un','boundary_cj','boundary_jc','boundary_cjn','boundary_am','hs_19'].forEach(function(id){
     var ly = LAYERS[id], path = _bndPaths[id];
     if (!path) return;
     if (!ly || !ly.visible || !ly.rings || !ly.rings.length) { path.setAttribute('d',''); return; }
@@ -3156,6 +3227,7 @@ function hsPattern(shape){
 function initHapseong(){
   // QGIS 그리기 순서: 면·선은 아래에, 점형 시설은 위에 배치한다.
   Object.keys(HAP_DATA).sort(function(a,b){return (HAP_DATA[a].svg?1:0)-(HAP_DATA[b].svg?1:0);}).forEach(function(lid){
+    if(lid==='hs_19')return; // 공통 구역계 전용 pane에서 표시한다.
     var data=HAP_DATA[lid],ly=LAYERS[lid];
     data.features.forEach(function(item){
       L.geoJSON(item.geometry,{style:function(){return Object.assign({},data.webStyle,{weight:data.webStyle.weight*ly.sz});},
@@ -3497,7 +3569,7 @@ function cullRegionMarkers(){
     var show = view.intersects(bb);
     rg.layers.forEach(function(lid){
       var ly = LAYERS[lid];
-      if(!ly || lid.indexOf('boundary')===0 || ly.wmsId) return;   // 경계·WMS는 자체 컬링 보유
+      if(!ly || isBoundaryLayer(lid) || ly.wmsId) return;   // 경계·WMS는 자체 컬링 보유
       if (ly._culled === !show) return;                             // 상태 변화 없으면 스킵
       ly._culled = !show;
       ly.mkrs.forEach(function(m){
@@ -4668,6 +4740,12 @@ function openLayerSheet(){
 // 단일 레이어 행 생성 (지역 내부에서도 사용)
 // 레이어 범례 스와치: 지도에 보이는 기호를 그대로 축소 (선형=선 색·패턴, 점형=마커 모양·색)
 function lpSwatch(id, ly){
+  var family=ELEMENT_FAMILIES[ly.elementFamily];
+  if(family){
+    if(ly.unifiedPoint)return '<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="11" fill="'+family.color+'" stroke="#fff" stroke-width="1.6"/><svg x="4.2" y="4.2" width="15.6" height="15.6" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-'+family.sym+'"/></svg></svg>';
+    if(family.line)return '<svg viewBox="0 0 24 18" width="24" height="18"><line x1="2" y1="9" x2="22" y2="9" stroke="'+family.color+'" stroke-width="3" stroke-dasharray="'+family.line.dashArray+'" stroke-linecap="round"/></svg>';
+  }
+  if(id==='hs_19'||id==='boundary_am')return '<svg viewBox="0 0 22 18" style="width:20px;height:16px;display:block"><line x1="2" y1="9" x2="20" y2="9" stroke="'+ly.color+'" stroke-width="2.4" stroke-dasharray="4 2.5" stroke-linecap="round"/></svg>';
   if(HAP_DATA[id]){var h=HAP_DATA[id],st=h.webStyle;
     if(h.svg)return '<img alt="" style="width:32px;height:32px" src="data:image/svg+xml;charset=utf-8,'+encodeURIComponent(h.svg)+'">';
     return '<svg viewBox="0 0 24 18" width="24" height="18">'+(h.features[0].geometry.type.indexOf('Polygon')>=0?'<rect x="2" y="3" width="20" height="12" fill="'+st.fillColor+'" fill-opacity="'+st.fillOpacity+'" stroke="'+st.color+'"/>':'<line x1="2" y1="9" x2="22" y2="9" stroke="'+st.color+'" stroke-width="3" stroke-linecap="round"'+(st.dashArray?' stroke-dasharray="'+st.dashArray+'"':'')+'/>')+'</svg>';
@@ -4677,7 +4755,7 @@ function lpSwatch(id, ly){
   if(id==='fence_am'||id==='aline1_am'||id==='aline2_am') return '<svg viewBox="0 0 22 18" style="width:20px;height:16px"><line x1="2" y1="9" x2="20" y2="9" stroke="'+c+'" stroke-width="3" stroke-dasharray="2 4"/></svg>';
   if(id==='boundary_am') return '<svg viewBox="0 0 22 18" style="width:20px;height:16px"><rect x="2" y="3" width="18" height="12" fill="'+c+'" fill-opacity=".12" stroke="#5b0000"/></svg>';
   function wrap(inner){ return '<svg viewBox="0 0 22 18" style="width:20px;height:16px;display:block">'+inner+'</svg>'; }
-  if (id.indexOf('boundary')===0)
+  if (isBoundaryLayer(id))
     return wrap('<line x1="2" y1="9" x2="20" y2="9" stroke="'+c+'" stroke-width="2.4" stroke-dasharray="4 2.5" stroke-linecap="round"/>');
   if (id==='stair_jc')
     return wrap('<line x1="2" y1="9" x2="20" y2="9" stroke="'+c+'" stroke-width="2.4" stroke-linecap="round"/><line x1="6.5" y1="4.5" x2="6.5" y2="13.5" stroke="'+c+'" stroke-width="1.7"/><line x1="11" y1="4.5" x2="11" y2="13.5" stroke="'+c+'" stroke-width="1.7"/><line x1="15.5" y1="4.5" x2="15.5" y2="13.5" stroke="'+c+'" stroke-width="1.7"/>');
@@ -4708,7 +4786,7 @@ function lpSwatch(id, ly){
 }
 function makeLayerRow(id) {
   var ly = LAYERS[id];
-  var isBoundary = (id.indexOf('boundary')===0);
+  var isBoundary = (isBoundaryLayer(id));
   var isWms = !!ly.wmsId;
   var hasSz = !isBoundary && !isWms;
   var row = document.createElement('div'); row.className='lp-row';
@@ -4771,6 +4849,7 @@ function _itemMeta(lid, item){
   } else {
     name='#'+(item.idx||item.id||''); sub=cs();
   }
+  if(ly.unifiedPoint){name=ly.name+' #'+(item.id||item.idx||'');if(item.addr)sub=item.addr+(sub?' · '+sub:'');}
   return {name:name, sub:sub, color:color};
 }
 
@@ -4841,7 +4920,7 @@ function gotoRegion(rg){
   if (rg && rg.layers){
     for (var gi=0; gi<rg.layers.length; gi++){
       var lid=rg.layers[gi];
-      if (lid.indexOf('boundary')===0 && LAYERS[lid] && LAYERS[lid].rings){
+      if (isBoundaryLayer(lid) && LAYERS[lid] && LAYERS[lid].rings){
         LAYERS[lid].rings.forEach(function(ring){ for(var j=0;j<ring.length;j++) pts.push(ring[j]); }); // [위도,경도]
       }
     }
@@ -4983,7 +5062,7 @@ function openOptionsSheet(){
   Object.keys(LAYERS).forEach(function(id){
     var ly=LAYERS[id];
     if(ly.wmsId) wms.push(id);
-    else if(id.indexOf('boundary')===0) bnd.push(id);
+    else if(isBoundaryLayer(id)) bnd.push(id);
     else if(id==='photo'||id==='survey'){}
     else fac.push(id);
   });
@@ -5854,7 +5933,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.80 · 2026-10-02 · 창원 합성동 레이어·현장기록';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.81 · 2026-10-02 · 구역계·레이어명·시설 기호 통일';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
@@ -5874,7 +5953,7 @@ document.addEventListener('click', function(e) {
     function(){ initAMI(); },                                                              // 부산 서구 아미동 2017 성과분석
     function(){ initCJN(); },                                                              // 청주 남주동·석교동 2022 성과분석
     function(){
-      Object.keys(LAYERS).forEach(function(id){ if(id.indexOf('boundary')!==0) applyVis(id); });
+      Object.keys(LAYERS).forEach(function(id){ if(!isBoundaryLayer(id)) applyVis(id); });
       drawBoundaries();   // 경계는 일괄 1회 갱신 (레이어별 반복 재계산 제거)
       updCounts();
       initRegionCJ();     // 청주 복대2동 — 주소 지오코딩 후 비동기 배치
