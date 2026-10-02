@@ -1131,7 +1131,17 @@ var curTile = (PROXY
 
 function vwUrl(t, e) {
   var base = PROXY + '/wmts/' + t + '/{z}/{y}/{x}.' + (e||'png');
-  return L.tileLayer(base, {maxZoom:19, crossOrigin:true, keepBuffer:4, updateWhenIdle:false, className:'basemap'});
+  var layer = L.tileLayer(base, {maxZoom:19, crossOrigin:true, keepBuffer:4, updateWhenIdle:false, className:'basemap'});
+  layer.on('tileerror', function() {
+    // 타일 오류 처리 이후 전환하고, 이미 제거된 레이어의 늦은 오류는 무시한다.
+    setTimeout(function() {
+      if (layer !== curTile && layer !== hybridBase) return;
+      var fallback = 'esri-sat';
+      setTile(fallback);
+      toast('VWorld 지도를 불러오지 못해 위성 지도로 전환했습니다.');
+    }, 0);
+  });
+  return layer;
 }
 // 배경 지도 채도/밝기 필터 — 마커·경계·범죄 오버레이는 영향 없음
 function setMapFilter(sat, bri){
@@ -5198,10 +5208,10 @@ document.addEventListener('click', function(e) {
   });
 
   // Restore tile
-  var st=lsLoad('tile','esri-street');
+  var st=lsLoad('tile',curKey);
   // Only switch tile if the VWorld proxy is configured
   if(st.startsWith('vw-') && !PROXY) st='esri-street';
-  if(st !== 'esri-street') setTile(st);
+  if(st !== curKey) setTile(st);
 
   // Restore photos
   var savedP = await idbAll('photos');
@@ -5246,7 +5256,6 @@ document.addEventListener('click', function(e) {
       var lastR = REGIONS[REGIONS.length - 1];  // 레이어 최상단 지역(GPS 못 잡았을 때 폴백)
       if (lastR && lastR.center) map.setView(lastR.center, lastR.zoom || 16);
     }
-    if(PROXY && st==='esri-street') setTile('vw-base');
   }, 60);
 
   if(savedP.length+savedS.length>0)
