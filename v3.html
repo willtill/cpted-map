@@ -1694,6 +1694,9 @@ var LAYERS = {
 Object.assign(LAYERS,{"hs_01":{"id":"hs_01","name":"CCTV 신설","color":"#f68c17","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"01 주거지 안전강화","info":""},"hs_03":{"id":"hs_03","name":"비상벨 설치","color":"#232323","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"01 주거지 안전강화","info":""},"hs_04":{"id":"hs_04","name":"보안등 신설","color":"#fff477","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"01 주거지 안전강화","info":""},"hs_08":{"id":"hs_08","name":"주택 방범모듈","color":"#424242","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"01 주거지 안전강화","info":""},"hs_17":{"id":"hs_17","name":"골목길 불밝히기","color":"#95c833","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"01 주거지 안전강화","info":"원본 9건 중 도형 없는 1건 제외"},"hs_05":{"id":"hs_05","name":"불법주정차 단속 CCTV","color":"#76366b","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"02 어린이 보행안전","info":""},"hs_10":{"id":"hs_10","name":"주요통학로 안심라인","color":"#ffb33d","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"02 어린이 보행안전","info":""},"hs_11":{"id":"hs_11","name":"도로다이어트","color":"#00a99c","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"02 어린이 보행안전","info":""},"hs_12":{"id":"hs_12","name":"안심놀이공간","color":"#e98400","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"02 어린이 보행안전","info":""},"hs_13":{"id":"hs_13","name":"골목놀이터 조명","color":"#f2e600","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"02 어린이 보행안전","info":""},"hs_15":{"id":"hs_15","name":"어린이공원 정비","color":"#4c684c","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"02 어린이 보행안전","info":""},"hs_06":{"id":"hs_06","name":"고보조명 설치","color":"#d92735","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"03 영역성 강화","info":""},"hs_07":{"id":"hs_07","name":"셉테드사업 안내판","color":"#ffffff","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"03 영역성 강화","info":""},"hs_09":{"id":"hs_09","name":"셔터 안전 그래픽","color":"#696969","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"03 영역성 강화","info":""},"hs_14":{"id":"hs_14","name":"방음벽 경관조명","color":"#b80093","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"04 철로변 조도개선","info":""},"hs_16":{"id":"hs_16","name":"지하도 환경개선","color":"#777077","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"04 철로변 조도개선","info":""},"hs_18":{"id":"hs_18","name":"가로수 수목정비·전신주 스마트 조명","color":"#794273","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"04 철로변 조도개선","info":""},"hs_02":{"id":"hs_02","name":"노후 CCTV 점검·기존 CCTV 표식","color":"#333333","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"05 경계·기존시설","info":""},"hs_19":{"id":"hs_19","name":"계획 대상지 구역계","color":"#ee1616","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"05 경계·기존시설","info":""},"hs_20":{"id":"hs_20","name":"계획도 내부 구분선","color":"#ee1616","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"05 경계·기존시설","info":""},"hs_21":{"id":"hs_21","name":"기존 가로등 및 보안등","color":"#333333","visible":true,"opacity":1.0,"sz":1,"mkrs":[],"cnt":0,"region":"changwon-hapseong","grp":"05 경계·기존시설","info":""}});
 // 신규 사례 구역계도 기존 사이트의 공통 구역계 스타일·전용 렌더러를 사용한다.
 ['boundary_am','hs_19'].forEach(function(id){Object.assign(LAYERS[id],{color:'#6366f1',strokeColor:'#6366f1',strokeOpacity:.95,dashArray:'6 4',opacity:.25,weight:3,sz:1,icon:'🗂',boundaryStyleVersion:1});});
+// 내부 경계는 대상지 구역계에 통합한다. 기존 기록 키는 보존한다.
+REGIONS.find(function(r){return r.id==='changwon-hapseong';}).layers=REGIONS.find(function(r){return r.id==='changwon-hapseong';}).layers.filter(function(id){return id!=='hs_20';});
+LAYERS.hs_20.name='대상지 구역계 (내부 경계)';
 function isBoundaryLayer(id){return id.indexOf('boundary')===0 || id==='hs_19';}
 // 표시 이름과 기호만 통일한다. 레이어 ID·원본 도형·현장기록 키는 유지한다.
 var CASE_LABELS={
@@ -2063,6 +2066,17 @@ function bndRings(){
     var polygons=it.geometry.type==='MultiPolygon'?it.geometry.coordinates:[it.geometry.coordinates];
     polygons.forEach(function(poly){poly.forEach(function(ring){LAYERS.hs_19.rings.push(ring.map(function(c){return [c[1],c[0]];}));});});
   });
+  // 닫힌 학교 경계는 evenodd 채움의 구멍으로, 열린 경계는 선으로만 그린다.
+  LAYERS.hs_19.openBoundaryLines=[];
+  HAP_DATA.hs_20.features.forEach(function(it){
+    var lines=it.geometry.type==='MultiLineString'?it.geometry.coordinates:[it.geometry.coordinates];
+    lines.forEach(function(line){
+      var first=line[0],last=line[line.length-1];
+      var points=line.map(function(c){return [c[1],c[0]];});
+      if(line.length>=4 && first[0]===last[0] && first[1]===last[1]) LAYERS.hs_19.rings.push(points);
+      else LAYERS.hs_19.openBoundaryLines.push(points);
+    });
+  });
   LAYERS.hs_19.cnt=HAP_DATA.hs_19.features.length;
   // 간소화(약 3m) + 경계별 bbox 계산(화면 밖 컬링용)
   ['boundary','boundary_smj','boundary_sj','boundary_bs','boundary_gn','boundary_un','boundary_cj','boundary_jc','boundary_cjn','boundary_am','hs_19'].forEach(function(id){
@@ -2101,6 +2115,12 @@ function initBoundary(){
     p.setAttribute('stroke-linejoin','round');
     bndSvg.appendChild(p);
     _bndPaths[id] = p;
+    if(id==='hs_19'){
+      var parts=document.createElementNS(NS,'path');
+      parts.setAttribute('fill','none');parts.setAttribute('stroke-linejoin','round');
+      parts.setAttribute('stroke-dasharray',LAYERS[id].dashArray);
+      bndSvg.appendChild(parts);_bndPaths[id+'-parts']=parts;
+    }
   });
   // 줌(핀치 중 포함)·회전·뷰 변경 시 좌표 재계산. pan은 mapPane가 함께 옮기므로 제외.
   map.on('zoom zoomend rotate viewreset resize moveend', requestBndDraw);
@@ -2120,6 +2140,7 @@ function drawBoundaries(){
   ['boundary','boundary_smj','boundary_sj','boundary_bs','boundary_gn','boundary_un','boundary_cj','boundary_jc','boundary_cjn','boundary_am','hs_19'].forEach(function(id){
     var ly = LAYERS[id], path = _bndPaths[id];
     if (!path) return;
+    var parts=_bndPaths[id+'-parts'];if(parts)parts.setAttribute('d','');
     if (!ly || !ly.visible || !ly.rings || !ly.rings.length) { path.setAttribute('d',''); return; }
     if (view && ly._bbox && !view.intersects(ly._bbox)) { path.setAttribute('d',''); return; } // 화면 밖이면 건너뜀
     var d = '';
@@ -2131,6 +2152,15 @@ function drawBoundaries(){
       }
       d += 'Z ';
     });
+    if(parts){
+      var lineD='';
+      (ly.openBoundaryLines||[]).forEach(function(line){line.forEach(function(ll,i){
+        var lp=map.latLngToLayerPoint(ll),p=map._rotate?map.rotatedPointToMapPanePoint(lp):lp;
+        lineD+=(i===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1)+' ';
+      });});
+      parts.setAttribute('d',lineD);parts.setAttribute('stroke',ly.strokeColor||ly.color);
+      parts.setAttribute('stroke-width',ly.weight);parts.setAttribute('stroke-opacity',ly.strokeOpacity!=null?ly.strokeOpacity:.95);
+    }
     path.setAttribute('d', d);            // 좌표만 갱신 — DOM 재생성 없음
     path.setAttribute('fill', ly.color);
     path.setAttribute('fill-opacity', ly.opacity);
@@ -3227,7 +3257,7 @@ function hsPattern(shape){
 function initHapseong(){
   // QGIS 그리기 순서: 면·선은 아래에, 점형 시설은 위에 배치한다.
   Object.keys(HAP_DATA).sort(function(a,b){return (HAP_DATA[a].svg?1:0)-(HAP_DATA[b].svg?1:0);}).forEach(function(lid){
-    if(lid==='hs_19')return; // 공통 구역계 전용 pane에서 표시한다.
+    if(lid==='hs_19'||lid==='hs_20')return; // 공통 구역계 전용 pane에서 표시한다.
     var data=HAP_DATA[lid],ly=LAYERS[lid];
     data.features.forEach(function(item){
       L.geoJSON(item.geometry,{style:function(){return Object.assign({},data.webStyle,{weight:data.webStyle.weight*ly.sz});},
@@ -4858,7 +4888,7 @@ function appendLayerRow(parent, lid){
   var ly = LAYERS[lid]; if(!ly) return;
   var row = makeLayerRow(lid);
   var items = getLayerData(lid);
-  var hasItems = items.length>0 && lid.indexOf('boundary')!==0 && !ly.wmsId;
+  var hasItems = items.length>0 && !isBoundaryLayer(lid) && !ly.wmsId;
   if (!hasItems){
     var sp=document.createElement('div'); sp.style.cssText='width:16px;flex-shrink:0;';
     row.insertBefore(sp, row.firstChild);
@@ -5933,7 +5963,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.81 · 2026-10-02 · 구역계·레이어명·시설 기호 통일';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.82 · 2026-10-02 · 합성동 학교 제외 구역계 수정';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
