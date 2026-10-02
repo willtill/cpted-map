@@ -672,6 +672,10 @@ html,body{width:100%;height:100%;overflow:hidden;
 .ami-error{color:#dc2626!important;}
 .ami-region-review{display:block;margin:12px 16px 4px;width:calc(100% - 32px);text-align:left;}
 
+.ami-export-btn{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:1px solid rgba(30,58,95,.2);border-radius:9px;background:rgba(255,255,255,.75);color:var(--accent);cursor:pointer;flex-shrink:0;}
+.ami-export-btn:hover{background:#fff;}
+.ami-export-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.ami-export-btn:disabled{opacity:.45;cursor:wait;}
 </style>
 </head>
 <body>
@@ -2778,6 +2782,112 @@ async function amiRenderPhotos(target,panel){
   }catch(e){if(panel.isConnected)list.textContent='사진을 불러오지 못했습니다. 상세 창을 다시 열어주세요.';}
 }
 
+// 아미동 전용 일괄 내보내기. 현재 기록을 읽되 저장된 사진/메모는 변경하지 않는다.
+var amiExportBusy=false;
+function amiExportTargets(){
+  var targets=[amiTarget()];
+  ['block_am','fence_am','aline1_am','aline2_am'].forEach(function(lid){
+    (AMI_DATA[lid].features||[]).forEach(function(item){targets.push(amiTarget(lid,item));});
+  });
+  return targets;
+}
+function amiExportSnapshot(photoRecords){
+  var records=amiExportTargets().map(function(t){
+    // 저장소 오류/손상은 누락된 백업으로 오인하지 않도록 내보내기를 중단한다.
+    var raw=localStorage.getItem(AMI_REVIEW_PREFIX+t.key),r=raw?JSON.parse(raw):{};
+    if(!r || typeof r!=='object' || (r.status!=null && AMI_REVIEW_STATUSES.indexOf(r.status)<0)) throw new Error('저장된 기록을 읽지 못했습니다: '+t.title);
+    return {key:t.key,title:t.title,layer:t.lid?LAYERS[t.lid].name:'대상지 전체',lat:t.lat,lng:t.lng,
+      memo:typeof r.memo==='string'?r.memo:'',status:r.status||'미확인',updatedAt:r.updatedAt||'',recorded:!!raw,photos:[]};
+  });
+  var linked=[];
+  photoRecords.forEach(function(p){
+    var rec=records.find(function(r){return amiPhotoMatches(p,r.key);});
+    if(!rec)return;
+    var entry={id:p.id,targetKey:rec.key,targetName:rec.title,name:p.name||'',date:p.date||'',lat:p.lat,lng:p.lng,
+      gpsSource:p.gpsSource||'',captureMemo:p.memo||'',captureDescription:p.desc||'',
+      currentMemo:rec.memo,currentStatus:rec.status,file:''};
+    linked.push({source:p,entry:entry,record:rec});
+  });
+  return {schemaVersion:1,regionId:'busan-ami',regionName:'부산 서구 아미동',exportedAt:new Date().toISOString(),records:records,linked:linked};
+}
+function amiExportCSV(rows){
+  return '\uFEFF'+rows.map(function(row){return row.map(function(value){
+    var s=value==null?'':String(value);
+    // 엑셀에서 사용자가 입력한 메모를 수식으로 실행하지 않는다.
+    if(/^[\s]*[=+@-]/.test(s))s="'"+s;
+    return '"'+s.replace(/"/g,'""')+'"';
+  }).join(',');}).join('\r\n');
+}
+function amiExportDocuments(snapshot){
+  var rows=[['대상지','항목ID','항목명','레이어','입력 여부','반영 여부','메모','최종 수정일(UTC)','위도','경도','사진 수','사진 파일']];
+  var text=['부산 서구 아미동 · 현장 입력 정보','내보낸 시각(UTC): '+snapshot.exportedAt,'메모·반영 여부는 내보내기 시점의 최신 저장 내용입니다.',''];
+  snapshot.records.forEach(function(r){
+    rows.push([snapshot.regionName,r.key,r.title,r.layer,r.recorded?'입력됨':'미입력',r.status,r.memo,r.updatedAt,r.lat,r.lng,r.photos.length,r.photos.join('\n')]);
+    text.push('['+r.title+']','항목ID: '+r.key,'입력 여부: '+(r.recorded?'입력됨':'미입력'),'반영 여부: '+r.status,
+      '최종 수정일(UTC): '+r.updatedAt,'대상 위치: '+r.lat+', '+r.lng,'사진: '+(r.photos.join(', ')||'없음'),'메모:',r.memo||'(없음)','');
+  });
+  var photoRows=[['사진 파일','사진ID','항목ID','항목명','사진 제목','사진 저장일','사진 위도','사진 경도','위치 출처','최신 반영 여부','최신 메모','사진 저장 당시 메모','사진 저장 당시 설명']];
+  snapshot.linked.forEach(function(link){var p=link.entry;photoRows.push([p.file,p.id,p.targetKey,p.targetName,p.name,p.date,p.lat,p.lng,p.gpsSource,p.currentStatus,p.currentMemo,p.captureMemo,p.captureDescription]);});
+  return {recordsCSV:amiExportCSV(rows),photosCSV:amiExportCSV(photoRows),text:text.join('\r\n'),json:JSON.stringify({
+    schemaVersion:snapshot.schemaVersion,regionId:snapshot.regionId,regionName:snapshot.regionName,
+    exportedAt:snapshot.exportedAt,records:snapshot.records,photos:snapshot.linked.map(function(l){return l.entry;})
+  },null,2)};
+}
+async function amiExportExtension(blob){
+  var b=new Uint8Array(await blob.slice(0,16).arrayBuffer());
+  if(b[0]===255 && b[1]===216)return 'jpg';
+  if(b[0]===137 && b[1]===80 && b[2]===78 && b[3]===71)return 'png';
+  if(b[0]===71 && b[1]===73 && b[2]===70)return 'gif';
+  if(String.fromCharCode.apply(null,b.slice(8,12))==='WEBP')return 'webp';
+  var brand=String.fromCharCode.apply(null,b.slice(8,12));
+  if(/^(avif|avis)$/.test(brand))return 'avif';
+  if(/^(heic|heix|hevc|hevx|mif1|msf1)$/.test(brand))return 'heic';
+  return {'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/heic':'heic','image/heif':'heif','image/avif':'avif','image/gif':'gif'}[blob.type]||'bin';
+}
+function amiExportReadPhotos(){
+  return openDB().then(function(db){return new Promise(function(resolve,reject){
+    var tx=db.transaction('photos','readonly'),q=tx.objectStore('photos').getAll();
+    q.onsuccess=function(){resolve(q.result||[]);};
+    q.onerror=tx.onabort=function(){reject(new Error('사진 저장소를 읽지 못했습니다. 다시 시도하세요.'));};
+  });});
+}
+function amiExportZipLibrary(){
+  if(window.JSZip)return Promise.resolve(window.JSZip);
+  return new Promise(function(resolve,reject){
+    var s=document.createElement('script'),timer=setTimeout(function(){s.remove();reject(new Error('압축 도구 연결 시간이 초과되었습니다. 다시 시도하세요.'));},20000);
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload=function(){clearTimeout(timer);window.JSZip?resolve(window.JSZip):reject(new Error('압축 도구를 열지 못했습니다.'));};
+    s.onerror=function(){clearTimeout(timer);s.remove();reject(new Error('인터넷 연결을 확인하고 다시 시도하세요.'));};
+    document.head.appendChild(s);
+  });
+}
+async function exportAmiReviews(button){
+  if(amiExportBusy)return;
+  amiExportBusy=true;button.disabled=true;button.setAttribute('aria-busy','true');
+  toast('아미동 입력 정보와 사진을 모으는 중…');pb(.05);
+  try{
+    var photoRecords=await amiExportReadPhotos(),snapshot=amiExportSnapshot(photoRecords);
+    var JSZip=await amiExportZipLibrary(),zip=new JSZip();
+    for(var i=0;i<snapshot.linked.length;i++){
+      var link=snapshot.linked[i],p=link.source;
+      var blob=_origFiles[p.id] instanceof Blob?_origFiles[p.id]:(p.origBlob instanceof Blob?p.origBlob:await exportImageBlob(p));
+      if(!blob || !blob.size)throw new Error(link.entry.targetName+'의 사진 파일을 읽지 못했습니다.');
+      var path='사진/'+String(i+1).padStart(3,'0')+'_'+link.entry.targetKey.replace(/[^a-zA-Z0-9_-]/g,'_')+'.'+await amiExportExtension(blob);
+      link.entry.file=path;link.record.photos.push(path);zip.file(path,blob);
+      pb(.1+.65*(i+1)/Math.max(1,snapshot.linked.length));
+    }
+    var docs=amiExportDocuments(snapshot);
+    zip.file('대상지_입력정보.csv',docs.recordsCSV);zip.file('대상지_입력정보.txt',docs.text);
+    zip.file('사진목록.csv',docs.photosCSV);zip.file('전체기록.json',docs.json);
+    zip.file('읽어주세요.txt','부산 서구 아미동 전용 내보내기\r\n\r\n대상지_입력정보.csv: 엑셀에서 여는 최신 메모·반영 여부·사진 연결 목록\r\n대상지_입력정보.txt: 전체 항목의 읽기용 기록\r\n사진목록.csv: 사진별 연결 항목·최신 기록·촬영 당시 기록\r\n사진 폴더: 연결된 사진 원본(원본이 없으면 저장된 표시용 이미지)\r\n전체기록.json: 구조화된 기록 보관용(현재 사이트에서 일괄 복원은 지원하지 않음)\r\n\r\n현재 기기 브라우저에 저장된 아미동 전용 상세 기록과 연결 사진만 포함합니다.\r\n미입력 항목도 목록에 포함됩니다. 사진 위치 출처가 대상지 기준 위치인 경우 촬영 GPS가 아닙니다.\r\n엑셀 수식으로 오인될 수 있는 입력은 CSV에서 앞에 작은따옴표를 붙입니다. 원문은 TXT·JSON에 보존됩니다.');
+    var blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'},function(m){pb(.8+.18*m.percent/100);});
+    var stamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\..+$/,'Z');
+    var downloaded=await shareOrDownload(blob,'부산아미동_입력정보_'+stamp+'.zip','부산 아미동 입력 정보');
+    toast(downloaded?'아미동 일괄 내보내기 완료 · 항목 '+snapshot.records.length+'개 / 사진 '+snapshot.linked.length+'장':'내보내기를 취소했습니다.');
+  }catch(e){toast('아미동 내보내기 실패 · '+(e&&e.message||'다시 시도하세요.'));}
+  finally{amiExportBusy=false;button.disabled=false;button.removeAttribute('aria-busy');document.querySelectorAll('.ami-export-btn').forEach(function(b){b.disabled=false;b.removeAttribute('aria-busy');});pb(0);}
+}
+
 // 아미동의 선·면 도형은 QGIS 원본 좌표와 도형 구성을 유지한다.
 function initAMI(){
   ['block_am','fence_am','aline1_am','aline2_am'].forEach(function(lid){
@@ -4453,6 +4563,7 @@ function buildLP(){
       '<span class="lp-grp-name" title="이 지역으로 이동">'+svgIc('pin','width:15px;height:15px;color:var(--accent);vertical-align:-2px;margin-right:3px')+''+rg.name+(rg.center?' '+svgIc('navigate','width:14px;height:14px;color:var(--accent);vertical-align:-2px;margin-left:1px'):'')+'</span>'+
       '<span class="lp-grp-cnt">'+totalMkrs+'개</span>'+
       '<span class="lp-grp-act">'+
+        (rg.id==='busan-ami'?'<button type="button" class="ami-export-btn" title="아미동 입력 정보 일괄 내보내기" aria-label="아미동 입력 정보 일괄 내보내기">'+svgIc('export','width:20px;height:20px')+'</button>':'')+
         '<span class="lp-grp-note" data-rid="'+rg.id+'" title="이 지역에 노트 추가">'+svgIc('note','width:20px;height:20px;color:var(--muted)')+'</span>'+
         '<div class="lp-grp-sw'+(onCnt>0?'':' off')+'" data-rid="'+rg.id+'" title="지역 전체 켜기/끄기"></div>'+
       '</span>';
@@ -4499,6 +4610,8 @@ function buildLP(){
       }
     });
     // 이 지역에 노트 추가
+    var exportBtn=hd.querySelector('.ami-export-btn');
+    if(exportBtn){exportBtn.disabled=amiExportBusy;exportBtn.addEventListener('click',function(e){e.stopPropagation();exportAmiReviews(exportBtn);});}
     var noteBtn = hd.querySelector('.lp-grp-note');
     if (noteBtn) noteBtn.addEventListener('click', function(e){
       e.stopPropagation();
@@ -5425,7 +5538,7 @@ document.addEventListener('click', function(e) {
   loadLayers();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.78 · 2026-10-02 · 아미동 현장 메모·반영 여부·사진';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.79 · 2026-10-02 · 아미동 입력 정보 일괄 내보내기';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
