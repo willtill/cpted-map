@@ -2678,11 +2678,18 @@ function _slRow(rec,isPhoto){
     '<span class="sl-del" data-id="'+eid+'" data-type="'+ty+'" style="cursor:pointer;flex:none;color:var(--danger);font-size:15px;padding:3px 5px;">🗑</span>'+
   '</div>';
 }
+function surveyPhotoVisibilityControl(){
+  var visible=LAYERS.photo.visible;
+  return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;margin-bottom:12px;background:var(--p2);border:1px solid var(--border);border-radius:8px;">'+
+    '<div><strong style="font-size:14px;">현장사진 지도 표시</strong><div style="font-size:11px;color:var(--muted);margin-top:4px;">'+(visible?'지도에 표시 중':'지도에서 숨김')+' · 사진은 보관됩니다</div></div>'+
+    '<button type="button" class="sl-act" data-act="photo-visibility" role="switch" aria-label="현장사진 지도 표시" aria-checked="'+visible+'" style="flex:none;min-height:44px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text);font:inherit;">'+(visible?'숨기기':'보이기')+'</button>'+
+    '</div>';
+}
 function _renderSurveyList(){
   var root=document.getElementById('slRoot'); if(!root)return;
   var total=photos.length+surveys.length, sel=_expCount();
-  if(!total){ root.innerHTML='<div style="padding:40px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:2">아직 기록이 없습니다<br>📸 버튼으로 현장 기록을 시작하세요</div>'; return; }
-  var h='';
+  var h=surveyPhotoVisibilityControl();
+  if(!total){ root.innerHTML=h+'<div style="padding:40px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:2">아직 기록이 없습니다<br>📸 버튼으로 현장 기록을 시작하세요</div>'; return; }
   h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;">'+
        '<div style="display:flex;gap:8px;">'+
          '<button class="sl-act" data-act="all" style="font-size:13px;padding:6px 12px;border:0.5px solid var(--border);border-radius:7px;background:var(--panel);color:var(--text);">전체 선택</button>'+
@@ -2754,6 +2761,10 @@ function _slClick(e){
   var t=e.target.closest('[data-act],[data-rid],[data-id]'); if(!t)return;
   if(t.hasAttribute('data-act')){
     var act=t.getAttribute('data-act');
+    if(act==='photo-visibility'){
+      LAYERS.photo.visible=!LAYERS.photo.visible;
+      applyVis('photo');saveLayers();_renderSurveyList();return;
+    }
     if(act==='all'){ _expGroups.forEach(function(g){_expSetRegion(g.id,true);}); _renderSurveyList(); }
     else if(act==='none'){ _expSel={}; _renderSurveyList(); }
     else if(act==='export'){ if(_expCount()) runSelectiveExport(); }
