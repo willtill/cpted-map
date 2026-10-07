@@ -407,8 +407,6 @@ html,body{width:100%;height:100%;overflow:hidden;
 .msat-preset:active{background:var(--accent);color:#fff;}
 .location-display-only,.location-display-only *{pointer-events:none!important;}
 .mctrl{align-items:flex-end;}
-.mc.photo-visibility-control{width:52px;height:52px;flex-direction:column;gap:2px;align-self:flex-end;}
-.photo-visibility-label{font-size:10px;font-weight:600;line-height:1.2;white-space:nowrap;}
 .photo-visibility-control[aria-pressed="true"]{color:var(--accent,#2563eb);outline:1px solid currentColor;}
 .photo-visibility-slash{display:none;}
 .photo-visibility-control.is-off .photo-visibility-slash{display:block;}
@@ -436,7 +434,6 @@ html,body{width:100%;height:100%;overflow:hidden;
 <div class="mctrl">
   <button type="button" class="mc photo-visibility-control" id="photoVisibilityBtn" aria-label="현장사진 지도 표시" aria-pressed="true" title="현장사진 지도에서 숨기기" disabled>
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m4 17 5-5 4 4 3-3 4 4"/><path class="photo-visibility-slash" d="m2 2 20 20"/></svg>
-    <span class="photo-visibility-label">사진 숨김</span>
   </button>
   <button class="mc mc-north" id="northBtn" title="탭: 정북 복귀 · 길게: 정북 고정"><svg id="northNeedle" width="26" height="26" viewBox="0 0 26 26"><text x="13" y="7" text-anchor="middle" font-size="7" font-weight="700" fill="#1e293b">N</text><polygon points="13,8 9,19 13,16 17,19" fill="#ef4444"/></svg></button>
   <button class="mc" id="locBtn">📍</button>
@@ -1215,7 +1212,6 @@ function syncPhotoVisibilityButton(){
   button.disabled=false;button.setAttribute('aria-pressed',String(visible));
   button.classList.toggle('is-off',!visible);
   button.title=visible?'현장사진 지도에서 숨기기':'현장사진 지도에 보이기';
-  button.querySelector('.photo-visibility-label').textContent=visible?'사진 숨김':'사진 표시';
 }
 document.getElementById('photoVisibilityBtn').addEventListener('click',function(){
   LAYERS.photo.visible=!LAYERS.photo.visible;
