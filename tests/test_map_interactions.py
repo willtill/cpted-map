@@ -32,7 +32,7 @@ class MapInteractions(unittest.TestCase):
         html = (ROOT / name).read_text().replace('})(); // end IIFE', '''
 window.__mapTest={map:map,layers:LAYERS,setLoc:setLoc,addMkr:addMkr,photos:photos,
   openLayerSheet:openLayerSheet,closeAll:closeAll,applyVis:applyVis,
-  saveLayers:saveLayers,requireIDBPut:requireIDBPut,mapPickCandidates:mapPickCandidates};
+  exportCount:_expCount,saveLayers:saveLayers,requireIDBPut:requireIDBPut,mapPickCandidates:mapPickCandidates};
 })(); // end IIFE''')
         def route(request):
             url = request.request.url
@@ -123,14 +123,24 @@ window.__mapTest={map:map,layers:LAYERS,setLoc:setLoc,addMkr:addMkr,photos:photo
                 self.assertEqual(page.evaluate('__mapTest.photos.length'), 1)
                 self.assertEqual(errors, [])
 
-    def test_survey_tab_photo_switch_syncs_without_changing_export_selection(self):
+    def test_map_photo_button_syncs_without_changing_records_or_selection(self):
         for name in ('v3.html', 'photo-map-mobile.html'):
             with self.subTest(page=name):
                 page, errors = self.app(name)
-                # The control is available before any photos have been taken.
-                page.locator('#ni-survey').click()
-                switch = page.get_by_role('switch', name='현장사진 지도 표시', exact=True)
-                self.assertEqual(switch.get_attribute('aria-checked'), 'true')
+                button = page.get_by_role('button', name='현장사진 지도 표시', exact=True)
+                self.assertEqual(button.get_attribute('aria-pressed'), 'true')
+                # The action is available on the map without opening any tab.
+                page.set_viewport_size({'width': 360, 'height': 640})
+                box = button.bounding_box()
+                self.assertGreater(box['x'], 280)
+                self.assertGreaterEqual(box['y'], 0)
+                self.assertGreaterEqual(box['width'], 44)
+                self.assertGreaterEqual(box['height'], 44)
+                self.assertLess(box['y']+box['height'], 640)
+                button.tap()
+                self.assertEqual(button.get_attribute('aria-pressed'), 'false')
+                self.assertEqual(button.inner_text(), '사진 표시')
+                self.assertFalse(page.locator('#sheet').evaluate('(e)=>e.classList.contains("on")'))
                 page.evaluate('''async () => {
                   const canvas=document.createElement('canvas');canvas.width=canvas.height=10;
                   await __mapTest.requireIDBPut('photos',{id:'p123',name:'사진 표시 검사',lat:35,lng:128,
@@ -139,33 +149,34 @@ window.__mapTest={map:map,layers:LAYERS,setLoc:setLoc,addMkr:addMkr,photos:photo
                 page.reload(wait_until='networkidle')
                 page.wait_for_function('__mapTest.photos.length===1')
                 self.assertEqual(page.evaluate('__mapTest.layers.photo.mkrs.length'), 1)
+                self.assertEqual(button.get_attribute('aria-pressed'), 'false')
                 page.evaluate('__mapTest.map.setView([35,128],18,{animate:false});__mapTest.applyVis("photo")')
-                page.locator('#ni-survey').click()
-                page.locator('.sl-chk[data-id="p123"]').click()
-                self.assertIn('선택 1', page.locator('#slRoot').inner_text())
-                page.get_by_role('switch', name='현장사진 지도 표시', exact=True).click()
-                self.assertEqual(page.get_by_role('switch', name='현장사진 지도 표시').get_attribute('aria-checked'), 'false')
                 self.assertTrue(page.evaluate('__mapTest.layers.photo.mkrs.every(m=>!__mapTest.map.hasLayer(m))'))
-                self.assertIn('선택 1', page.locator('#slRoot').inner_text())
-                self.assertIn('사진 표시 검사', page.locator('#slRoot').inner_text())
+                button.tap()
+                self.assertEqual(button.get_attribute('aria-pressed'), 'true')
+                self.assertEqual(button.inner_text(), '사진 숨김')
+                self.assertTrue(page.evaluate('__mapTest.layers.photo.mkrs.every(m=>__mapTest.map.hasLayer(m))'))
+                page.locator('#ni-survey').click()
+                self.assertEqual(page.get_by_role('switch', name='현장사진 지도 표시', exact=True).count(), 0)
+                page.locator('.sl-chk[data-id="p123"]').click()
+                self.assertEqual(page.evaluate('__mapTest.exportCount()'), 1)
+                page.locator('#shX').click()
+                button.tap()
+                self.assertTrue(page.evaluate('__mapTest.layers.photo.mkrs.every(m=>!__mapTest.map.hasLayer(m))'))
+                self.assertEqual(page.evaluate('__mapTest.exportCount()'), 1)
+                self.assertEqual(page.evaluate('__mapTest.photos[0].name'), '사진 표시 검사')
                 page.evaluate('__mapTest.openLayerSheet()')
                 layer_switch = page.get_by_role('switch', name='현장 사진 지도에 표시', exact=True)
                 self.assertEqual(layer_switch.get_attribute('aria-checked'), 'false')
                 layer_switch.click()
+                self.assertEqual(button.get_attribute('aria-pressed'), 'true')
                 self.assertTrue(page.evaluate('__mapTest.layers.photo.mkrs.every(m=>__mapTest.map.hasLayer(m))'))
                 page.locator('#shX').click()
-                page.locator('#ni-survey').click()
-                self.assertEqual(page.get_by_role('switch', name='현장사진 지도 표시').get_attribute('aria-checked'), 'true')
-                page.get_by_role('switch', name='현장사진 지도 표시').click()
+                button.tap()
                 page.reload(wait_until='networkidle')
                 page.wait_for_function('__mapTest.photos.length===1')
-                self.assertEqual(page.evaluate('__mapTest.layers.photo.mkrs.length'), 1)
-                page.locator('#ni-survey').click()
-                self.assertEqual(page.get_by_role('switch', name='현장사진 지도 표시').get_attribute('aria-checked'), 'false')
+                self.assertEqual(button.get_attribute('aria-pressed'), 'false')
                 self.assertEqual(page.evaluate('__mapTest.photos.length'), 1)
-                page.get_by_role('switch', name='현장사진 지도 표시').click()
-                page.evaluate('__mapTest.map.setView([35,128],18,{animate:false});__mapTest.applyVis("photo")')
-                self.assertTrue(page.evaluate('__mapTest.layers.photo.mkrs.every(m=>__mapTest.map.hasLayer(m))'))
                 self.assertEqual(errors, [])
 
     def test_polygon_holes_and_duplicate_feature_parts(self):

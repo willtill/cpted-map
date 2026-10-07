@@ -406,6 +406,12 @@ html,body{width:100%;height:100%;overflow:hidden;
 .msat-preset{flex:1;padding:9px 6px;border-radius:8px;border:1px solid var(--border);background:var(--p2);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;}
 .msat-preset:active{background:var(--accent);color:#fff;}
 .location-display-only,.location-display-only *{pointer-events:none!important;}
+.mctrl{align-items:flex-end;}
+.mc.photo-visibility-control{width:52px;height:52px;flex-direction:column;gap:2px;align-self:flex-end;}
+.photo-visibility-label{font-size:10px;font-weight:600;line-height:1.2;white-space:nowrap;}
+.photo-visibility-control[aria-pressed="true"]{color:var(--accent,#2563eb);outline:1px solid currentColor;}
+.photo-visibility-slash{display:none;}
+.photo-visibility-control.is-off .photo-visibility-slash{display:block;}
 </style>
 </head>
 <body>
@@ -428,6 +434,10 @@ html,body{width:100%;height:100%;overflow:hidden;
 
 <!-- MAP CONTROLS -->
 <div class="mctrl">
+  <button type="button" class="mc photo-visibility-control" id="photoVisibilityBtn" aria-label="현장사진 지도 표시" aria-pressed="true" title="현장사진 지도에서 숨기기" disabled>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m4 17 5-5 4 4 3-3 4 4"/><path class="photo-visibility-slash" d="m2 2 20 20"/></svg>
+    <span class="photo-visibility-label">사진 숨김</span>
+  </button>
   <button class="mc mc-north" id="northBtn" title="탭: 정북 복귀 · 길게: 정북 고정"><svg id="northNeedle" width="26" height="26" viewBox="0 0 26 26"><text x="13" y="7" text-anchor="middle" font-size="7" font-weight="700" fill="#1e293b">N</text><polygon points="13,8 9,19 13,16 17,19" fill="#ef4444"/></svg></button>
   <button class="mc" id="locBtn">📍</button>
   <button class="mc" id="rotBtn" title="네비게이션 모드(방향따라 회전)">🧭</button>
@@ -1199,7 +1209,21 @@ var LAYERS = {
 var L_ORDER = ['survey','photo','cctv','light','vacant','boundary','safemap'];
 var L_BASE  = {vacant:20, light:20, cctv:20, photo:42, survey:32, boundary:0};
 
+function syncPhotoVisibilityButton(){
+  var button=document.getElementById('photoVisibilityBtn');if(!button)return;
+  var visible=!!LAYERS.photo.visible;
+  button.disabled=false;button.setAttribute('aria-pressed',String(visible));
+  button.classList.toggle('is-off',!visible);
+  button.title=visible?'현장사진 지도에서 숨기기':'현장사진 지도에 보이기';
+  button.querySelector('.photo-visibility-label').textContent=visible?'사진 숨김':'사진 표시';
+}
+document.getElementById('photoVisibilityBtn').addEventListener('click',function(){
+  LAYERS.photo.visible=!LAYERS.photo.visible;
+  applyVis('photo');saveLayers();
+});
+
 function applyVis(id) {
+  if(id==='photo')syncPhotoVisibilityButton();
   var ly = LAYERS[id];
   if (id==='boundary'||id==='boundary_smj'||id==='boundary_sj'||id==='boundary_bs'||id==='boundary_gn') { drawBoundaries(); return; }
   if (ly.wmsId && ly.wms) { ly.visible ? map.addLayer(ly.wms) : map.removeLayer(ly.wms); return; }
@@ -2678,17 +2702,10 @@ function _slRow(rec,isPhoto){
     '<span class="sl-del" data-id="'+eid+'" data-type="'+ty+'" style="cursor:pointer;flex:none;color:var(--danger);font-size:15px;padding:3px 5px;">🗑</span>'+
   '</div>';
 }
-function surveyPhotoVisibilityControl(){
-  var visible=LAYERS.photo.visible;
-  return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;margin-bottom:12px;background:var(--p2);border:1px solid var(--border);border-radius:8px;">'+
-    '<div><strong style="font-size:14px;">현장사진 지도 표시</strong><div style="font-size:11px;color:var(--muted);margin-top:4px;">'+(visible?'지도에 표시 중':'지도에서 숨김')+' · 사진은 보관됩니다</div></div>'+
-    '<button type="button" class="sl-act" data-act="photo-visibility" role="switch" aria-label="현장사진 지도 표시" aria-checked="'+visible+'" style="flex:none;min-height:44px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text);font:inherit;">'+(visible?'숨기기':'보이기')+'</button>'+
-    '</div>';
-}
 function _renderSurveyList(){
   var root=document.getElementById('slRoot'); if(!root)return;
   var total=photos.length+surveys.length, sel=_expCount();
-  var h=surveyPhotoVisibilityControl();
+  var h='';
   if(!total){ root.innerHTML=h+'<div style="padding:40px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:2">아직 기록이 없습니다<br>📸 버튼으로 현장 기록을 시작하세요</div>'; return; }
   h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;">'+
        '<div style="display:flex;gap:8px;">'+
@@ -2761,10 +2778,6 @@ function _slClick(e){
   var t=e.target.closest('[data-act],[data-rid],[data-id]'); if(!t)return;
   if(t.hasAttribute('data-act')){
     var act=t.getAttribute('data-act');
-    if(act==='photo-visibility'){
-      LAYERS.photo.visible=!LAYERS.photo.visible;
-      applyVis('photo');saveLayers();_renderSurveyList();return;
-    }
     if(act==='all'){ _expGroups.forEach(function(g){_expSetRegion(g.id,true);}); _renderSurveyList(); }
     else if(act==='none'){ _expSel={}; _renderSurveyList(); }
     else if(act==='export'){ if(_expCount()) runSelectiveExport(); }
@@ -3980,6 +3993,7 @@ document.addEventListener('click', function(e) {
 
   // Layer prefs
   loadLayers();
+  syncPhotoVisibilityButton();
 
   // Init data
   var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v2.9 · 2026-06-12 · 개별파일 내보내기';
