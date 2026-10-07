@@ -39,3 +39,18 @@ JSZIP_PATH=/tmp/cpted-jszip-3.10.1.js python3 -m unittest discover -s tests -v
    지역별 ZIP은 원본 사진 형식을 유지합니다.
 4. 공유를 취소했다가 재시도합니다. 취소한 저장을 완료로 표시하거나 기록을
    삭제하면 안 됩니다. 공유를 지원하지 않는 경우 개별 파일 링크로 저장합니다.
+
+## 지도 조작 회귀 검사
+
+`MAP_ASSET_DIR`에 Leaflet 1.9.3의 `leaflet.js`, `leaflet.css`와
+leaflet-rotate 0.2.8의 `leaflet-rotate.js`를 두고 실행합니다. 실제 HTML과
+Leaflet을 로드하며 외부 지도 타일 요청은 차단합니다. 테스트 전용 접근자는
+테스트가 제공하는 HTML에만 삽입되며 배포 파일에는 포함되지 않습니다.
+
+```sh
+MAP_ASSET_DIR=/path/to/map-assets python3 -m unittest discover -s tests -p test_map_interactions.py -v
+```
+
+현재위치 표시 아래 점 터치, 회전한 지도에서 겹친 선 선택, 숨긴 레이어/장식선 제외,
+복합 도형 중복 제거, 폴리곤 내부 구멍 제외, 사진 표시 상태 저장 및 실제 사진 기록
+보존을 확인합니다. 두 HTML 페이지에서 실제 터치 이벤트로 검사합니다.

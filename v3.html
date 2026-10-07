@@ -682,6 +682,7 @@ html,body{width:100%;height:100%;overflow:hidden;
 .ami-export-btn:hover{background:#fff;}
 .ami-export-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 .ami-export-btn:disabled{opacity:.45;cursor:wait;}
+.location-display-only,.location-display-only *{pointer-events:none!important;}
 </style>
 </head>
 <body>
@@ -1340,11 +1341,11 @@ function setLoc(lat, lng, acc) {
     locM = L.marker([lat,lng], {
       icon: L.divIcon({
         html:'<div class="loc-marker"><svg class="loc-cone" id="locCone" viewBox="0 0 48 48" width="48" height="48"><path d="M24 4 L31 16 Q24 13 17 16 Z" fill="rgba(37,99,235,.9)" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg><div class="loc-dot"></div></div>',
-        className:'', iconSize:[48,48], iconAnchor:[24,24]
+        className:'location-display-only', iconSize:[48,48], iconAnchor:[24,24]
       }),
-      zIndexOffset: 1000
+      zIndexOffset: 1000, interactive:false, keyboard:false
     }).addTo(map);
-    locC = L.circle([lat,lng], {radius:acc||30, color:'#2563eb', fillColor:'#2563eb', fillOpacity:.1, weight:1.5}).addTo(map);
+    locC = L.circle([lat,lng], {interactive:false, radius:acc||30, color:'#2563eb', fillColor:'#2563eb', fillOpacity:.1, weight:1.5}).addTo(map);
   } else {
     locM.setLatLng([lat,lng]);
     if (locC) locC.setLatLng([lat,lng]).setRadius(acc||30);
@@ -1818,6 +1819,78 @@ function addStairBands(id,line){
     band._isLine=true;band._wBase=7;band.addTo(map);addMkr(id,band);
   });
 }
+// 보이는 요소만 화면 픽셀 단위로 판정한다. 지도 회전/줌과 무관한 터치 여유폭.
+function mapPickContains(layer, point, client){
+  if(layer instanceof L.Marker){
+    var el=layer.getElement();if(!el)return false;
+    var box=el.getBoundingClientRect();
+    return client.x>=box.left-5 && client.x<=box.right+5 && client.y>=box.top-5 && client.y<=box.bottom+5;
+  }
+  if(layer instanceof L.CircleMarker){
+    return map.latLngToContainerPoint(layer.getLatLng()).distanceTo(point)<=layer.getRadius()+8;
+  }
+  if(!(layer instanceof L.Polyline))return false;
+  var tolerance=Math.max(14,(layer.options.weight||0)/2),polygon=layer instanceof L.Polygon;
+  function ringPoints(ring){return ring.map(function(ll){return map.latLngToContainerPoint(ll);});}
+  function edge(points,closed){
+    for(var i=1;i<points.length;i++)if(L.LineUtil.pointToSegmentDistance(point,points[i-1],points[i])<=tolerance)return true;
+    return closed && points.length>2 && L.LineUtil.pointToSegmentDistance(point,points[points.length-1],points[0])<=tolerance;
+  }
+  function inside(points){
+    var yes=false;
+    for(var i=0,j=points.length-1;i<points.length;j=i++){
+      var a=points[i],b=points[j];
+      if((a.y>point.y)!==(b.y>point.y) && point.x<(b.x-a.x)*(point.y-a.y)/(b.y-a.y)+a.x)yes=!yes;
+    }
+    return yes;
+  }
+  function hit(coords){
+    if(!coords.length)return false;
+    if(coords[0].lat!=null){var points=ringPoints(coords);return edge(points,polygon)||(polygon && inside(points));}
+    if(polygon && coords[0].length && coords[0][0].lat!=null){
+      var rings=coords.map(ringPoints);
+      if(rings.some(function(r){return edge(r,true);}))return true;
+      return inside(rings[0])&&!rings.slice(1).some(inside);
+    }
+    return coords.some(hit);
+  }
+  return hit(layer.getLatLngs());
+}
+function mapPickCandidates(point,client){
+  var found=[],seen=new Set();
+  Object.keys(LAYERS).forEach(function(id){
+    var ly=LAYERS[id];if(!ly.visible || ly.opacity===0 || ly._culled)return;
+    ly.mkrs.forEach(function(m,index){
+      if(!map.hasLayer(m) || m.options.interactive===false || !m.listens('click'))return;
+      if(!mapPickContains(m,point,client))return;
+      var key=m._pickKey||L.stamp(m);if(seen.has(key))return;seen.add(key);
+      var label=m._pickLabel||(m._sv&&m._sv.title);
+      if(!label && m._pid){var p=photos.find(function(p){return p.id===m._pid;});label=p&&p.name;}
+      found.push({layer:m,label:label||(ly.name+' #'+(index+1)),group:ly.name});
+    });
+  });
+  return found;
+}
+function openMapPickList(items,latlng){
+  openSheet('겹친 요소 선택 · '+items.length+'개','');
+  var body=document.getElementById('shBody');
+  var hint=document.createElement('p');hint.textContent='확인할 요소를 선택하세요.';hint.style.cssText='padding:12px 16px;color:var(--muted);';body.appendChild(hint);
+  items.forEach(function(item){
+    var button=document.createElement('button');button.type='button';button.className='map-pick-item';
+    button.style.cssText='display:block;width:100%;padding:14px 16px;text-align:left;background:var(--panel);color:var(--text);border:0;border-bottom:1px solid var(--border);font:inherit;min-height:48px;';
+    var title=document.createElement('strong');title.textContent=item.label;button.appendChild(title);
+    var sub=document.createElement('div');sub.textContent=item.group;sub.style.cssText='margin-top:4px;font-size:12px;color:var(--muted);';button.appendChild(sub);
+    button.onclick=function(){closeAll();item.layer.fire('click',{latlng:latlng});};body.appendChild(button);
+  });
+}
+map.getContainer().addEventListener('click',function(e){
+  if(e.target.closest('.leaflet-control,.leaflet-popup') || (map.dragging && map.dragging.moved()))return;
+  var point=map.mouseEventToContainerPoint(e),items=mapPickCandidates(point,{x:e.clientX,y:e.clientY});
+  if(items.length<2)return;
+  e.preventDefault();e.stopImmediatePropagation();
+  openMapPickList(items,map.containerPointToLatLng(point));
+},true);
+
 function addMkr(id, m) {
   var ly = LAYERS[id];
   applyUnifiedElement(id,m);
@@ -2646,6 +2719,7 @@ function _jcLineLayer(lid, arr, typeName, grad){
   arr.forEach(function(it){
     var disp = it.off ? _offsetPath(it.path, it.off) : it.path;   // 표시 경로 (겹침 분리)
     var pl = L.polyline(disp, {color:ly.color, weight:4, opacity:1});
+    pl._pickKey=lid+':'+it.id;pl._pickLabel=ly.name+' #'+it.id+(it.addr?' · '+it.addr:'');
     pl._isLine = true; pl._wBase = 4; pl.addTo(map);
     pl.on('click', function(){openInfo(ly.icon+' '+it.addr,
       '<div class="ic-ico" style="background:'+grad+'">'+ly.icon+'</div>'+
@@ -3337,6 +3411,7 @@ function initHapseong(){
         if(!data.svg){shape._isLine=true;shape._wBase=data.webStyle.weight;}
         shape.addTo(map);
         if(lid==='hs_15'){shape.on('add',function(){hsPattern(shape);});hsPattern(shape);}
+        shape._pickKey=lid+':'+item.id;shape._pickLabel=ly.name+' #'+item.id;
         shape.on('click',function(){openHsTarget(hsTarget(lid,item));});addMkr(lid,shape);
       });
     });ly.cnt=data.features.length;
@@ -3381,6 +3456,7 @@ function initAMI(){
       var open=function(){openAmiTarget(amiTarget(lid,it));};
       if(it.geometry.type==='Point'){
         var marker=L.marker([it.geometry.coordinates[1],it.geometry.coordinates[0]],{icon:amiPointIcon(lid,ly.sz)}).addTo(map);
+        marker._pickKey=lid+':'+it.id;marker._pickLabel=ly.name+' #'+it.id;
         marker.on('click',open);addMkr(lid,marker);return;
       }
       var polygon=it.geometry.type.indexOf('Polygon')>=0;
@@ -3389,6 +3465,7 @@ function initAMI(){
       if(ly.amiStyle==='walkway'||ly.amiStyle==='stairs')style.dashArray=null;
       if(ly.amiStyle==='floorlight')style.dashArray='1 7';
       L.geoJSON(it.geometry,{style:style}).eachLayer(function(shape){
+        shape._pickKey=lid+':'+it.id;shape._pickLabel=ly.name+' #'+it.id;
         shape._isLine=true;shape._wBase=base;shape.addTo(map);shape.on('click',open);addMkr(lid,shape);
       });
 
@@ -4925,6 +5002,14 @@ function makeLayerRow(id) {
     '<div class="lp-cnt">'+(isWms?(ly.wms?'활성':'키없음'):(ly.cnt>0?ly.cnt:((AMI_DATA[id]||HAP_DATA[id])?'0':'')))+'</div>'+
     '<div class="lp-nm">'+ly.name+((AMI_DATA[id]||HAP_DATA[id])&&ly.info?'<div style="font-size:10px;font-weight:400;color:var(--muted);margin-top:3px">'+ly.info+'</div>':'')+'</div>'+
     '<div class="lp-eye'+(ly.visible?'':' off')+'" data-id="'+id+'"></div>';
+  var eye=row.querySelector('.lp-eye');
+  eye.setAttribute('role','switch');eye.setAttribute('aria-checked',String(ly.visible));
+  eye.setAttribute('aria-label',ly.name+' 지도에 표시');eye.tabIndex=0;
+  eye.addEventListener('keydown',function(e){if(e.key===' '||e.key==='Enter'){e.preventDefault();this.click();}});
+  if(id==='photo'){
+    var status=document.createElement('div');status.textContent=(ly.visible?'지도에 표시 중':'지도에서 숨김')+' · 사진은 보관됩니다';
+    status.style.cssText='font-size:11px;color:var(--muted);margin-top:4px;';row.querySelector('.lp-nm').appendChild(status);
+  }
   row.querySelector('.lp-eye').addEventListener('click', function(e){
     e.stopPropagation();
     var lid=this.dataset.id; LAYERS[lid].visible=!LAYERS[lid].visible;
@@ -6070,7 +6155,7 @@ async function importFromFiles(files){
   }
 
   pb(1); setTimeout(function(){pb(0);},500);
-  if(cnt.p) LAYERS.photo.visible = true;   // 불러온 사진 레이어 ON
+  // 사진을 불러와도 사용자가 선택한 레이어 표시 상태를 유지한다.
   rebuildPhotoMarkers({toast:true});       // photos[] 기준 마커 일괄 생성 + 결과 토스트
   if(cnt.p) saveLayers();
 
