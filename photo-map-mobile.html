@@ -585,8 +585,8 @@ function openDB() {
       if (!d.objectStoreNames.contains('photos'))  d.createObjectStore('photos',  {keyPath:'id'});
       if (!d.objectStoreNames.contains('surveys')) d.createObjectStore('surveys', {keyPath:'id'});
     };
-    req.onsuccess  = function(e) { db = e.target.result; res(db); };
-    req.onerror    = function() { rej(); };
+    req.onsuccess  = function(e) { db = e.target.result; db.onversionchange=function(){this.close();if(db===this)db=null;}; res(db); };
+    req.onerror    = function() { rej(req.error || new Error('기기 저장소를 열지 못했습니다.')); };
   });
 }
 function idbAll(store) {
@@ -601,11 +601,18 @@ function idbAll(store) {
 function idbPut(store, obj) {
   return openDB().then(function(d) {
     return new Promise(function(res) {
-      var tx = d.transaction(store,'readwrite');
-      tx.objectStore(store).put(obj);
-      tx.oncomplete = res; tx.onerror = res;
+      try {
+        var tx = d.transaction(store,'readwrite');
+        tx.objectStore(store).put(obj);
+        tx.oncomplete = function(){ res(true); };
+        tx.onerror = tx.onabort = function(){ console.warn('기기 저장 실패',store,tx.error);res(false); };
+      } catch(e){ console.warn('기기 저장 실패',store,e);res(false); }
     });
-  });
+  }).catch(function(e){ console.warn('기기 저장소 열기 실패',e);return false; });
+}
+async function requireIDBPut(store, obj){
+  if(!await idbPut(store,obj))throw new Error('기기에 저장하지 못했습니다. 저장 공간과 Safari의 사이트 데이터 설정을 확인한 뒤 다시 시도하세요. 입력 내용은 닫지 말고 유지해 주세요.');
+  return true;
 }
 function idbDel(store, key) {
   return openDB().then(function(d) {
@@ -2130,8 +2137,8 @@ function openPhotoMetaSheet(file, onNextCb) {
     if (!pmDraft.annotatedBlob) return;
     var d = new Date(), pad = function(n){return String(n).padStart(2,'0');};
     var ts = d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds());
-    await shareOrDownload(pmDraft.annotatedBlob, 'CPTED_' + ts + '.jpg', 'CPTED 현장사진');
-    toast('📤 저장 완료');
+    var saved=await shareOrDownload(pmDraft.annotatedBlob, 'CPTED_' + ts + '.jpg', 'CPTED 현장사진');
+    toast(saved?'📤 저장 완료':'파일 저장을 취소했습니다');
   });
 }
 
@@ -2367,8 +2374,8 @@ async function pmSave(onNextCb) {
       hasXmp: false,
       heading: _hdg
     };
+    await requireIDBPut('photos', p);
     photos.push(p);
-    await idbPut('photos', p);
     if (p.lat) addMkr('photo', mkPhotoMkr(p));
     updCounts();
     if (p.lat) map.flyTo([p.lat, p.lng], 17, {duration:.8});
@@ -2386,11 +2393,11 @@ async function pmSave(onNextCb) {
           rating:pmDraft.rating, location:pmDraft.lat?pmDraft.lat.toFixed(6)+','+pmDraft.lng.toFixed(6):'' };
         var annotated = await injectXMPIntoJPEG(pmDraft.file, buildXMPPacket(meta));
         p.hasXmp = true;
-        await idbPut('photos', p);
+        await requireIDBPut('photos', p);
         var d = new Date(), pad = function(n){return String(n).padStart(2,'0');};
         var ts = d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds());
-        await shareOrDownload(annotated, 'CPTED_'+ts+'.jpg', 'CPTED 현장사진');
-        toast('✅ 원본 화질 파일 저장됨');
+        var _ok=await shareOrDownload(annotated, 'CPTED_'+ts+'.jpg', 'CPTED 현장사진');
+        toast(_ok?'✅ 원본 화질 파일 저장됨':'사진은 앱에 저장되었습니다. 파일 저장은 취소했습니다.');
       } catch(xe) {
         console.warn('[pmSave] XMP/다운로드 실패:', xe);
         toast('📷 저장됨 (파일 다운로드 실패 — 내보내기로 추출 가능)');
@@ -2535,8 +2542,9 @@ async function saveSurvey(){
     gpsSource: draft.gpsSource||null,
     time: new Date().toLocaleString('ko-KR')
   };
+  try{ await requireIDBPut('surveys', sv); }
+  catch(e){ toast(e.message,6000); return; }
   surveys.push(sv);
-  await idbPut('surveys', sv);
   if (sv.lat) addMkr('survey', mkSurveyMkr(sv));
   updCounts();
   closeAll();
@@ -3242,27 +3250,119 @@ function isIOS(){
   return /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
     (navigator.maxTouchPoints > 1 && /Mac/i.test(navigator.userAgent));
 }
-async function shareOrDownload(blob, filename, shareTitle) {
-  if (isIOS() && navigator.share && navigator.canShare) {
-    var file = new File([blob], filename, {type: blob.type});
-    if (navigator.canShare({files: [file]})) {
-      try {
-        await navigator.share({files: [file], title: shareTitle || filename});
-        return;
-      } catch(e) {
-        if (e.name === 'AbortError') return;
-      }
+// 파일 준비가 끝난 뒤 새 탭 동작에서 공유한다. Safari의 사용자 활성화는
+// IndexedDB 읽기·이미지 처리·ZIP 생성 동안 만료될 수 있다.
+function savePreparedFiles(files, title){
+  return new Promise(function(resolve){
+    var dialog=document.createElement('dialog'),urls=[],finished=false;
+    dialog.className='file-save-dialog';
+    dialog.setAttribute('aria-label',title||'파일 저장');
+    dialog.style.cssText='box-sizing:border-box;position:fixed;inset:0;margin:auto;width:calc(100% - 32px);max-width:420px;max-height:80vh;overflow:auto;padding:24px;border:1px solid #bcc8d4;border-radius:16px;background:#fff;color:#14273b;z-index:10000;';
+    var heading=document.createElement('h3');heading.textContent=title||'파일 저장';dialog.appendChild(heading);
+    var status=document.createElement('p');status.setAttribute('role','status');
+    status.textContent='파일이 준비되었습니다. 공유 화면에서 “파일에 저장” 또는 “이미지 저장”을 선택하세요.';
+    status.style.cssText='margin:16px 0;line-height:1.6;';dialog.appendChild(status);
+    function button(label){
+      var b=document.createElement('button');b.type='button';b.textContent=label;
+      b.style.cssText='display:block;width:100%;padding:12px;margin-top:12px;border:1px solid #bcc8d4;border-radius:8px;background:#f2f5f9;color:#14273b;font:inherit;';
+      dialog.appendChild(b);return b;
     }
-  }
-  // PC: 직접 다운로드
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+    function finish(ok){
+      if(finished)return;finished=true;dialog.close();dialog.remove();
+      // Safari가 파일을 인계받을 시간을 확보한다. 준비 중에는 URL을 폐기하지 않는다.
+      setTimeout(function(){urls.forEach(function(url){URL.revokeObjectURL(url);});},60000);
+      resolve(ok);
+    }
+    var share=button('공유 / 파일에 저장'),canShare=false;
+    try{canShare=!!(navigator.share && navigator.canShare && navigator.canShare({files:files}));}catch(_){}
+    share.hidden=!canShare;share.style.display=canShare?'block':'none';
+    share.onclick=function(){
+      share.disabled=true;cancel.disabled=true;
+      var result;
+      // 이 호출 앞에 await/타이머/파일 처리를 넣지 않는다.
+      try{result=navigator.share({files:files,title:title||'CPTED 현장기록'});}
+      catch(e){failed(e);return;}
+      Promise.resolve(result).then(function(){finish(true);},failed);
+    };
+    function failed(e){
+      share.disabled=false;cancel.disabled=false;
+      status.textContent=e && e.name==='AbortError'
+        ? '공유를 취소했습니다. 다시 저장하거나 닫을 수 있습니다.'
+        : '공유를 열지 못했습니다. 다시 시도하거나 아래 파일 저장을 이용하세요. 다른 앱 안에서 열었다면 Safari에서 다시 열어 주세요.';
+    }
+    var fallback=document.createElement('details');dialog.appendChild(fallback);
+    var summary=document.createElement('summary');summary.textContent='개별 파일로 저장';summary.style.marginTop='16px';fallback.appendChild(summary);
+    var hint=document.createElement('p');hint.textContent='파일을 눌러 저장하세요. 미리보기가 열리면 공유 메뉴에서 “파일에 저장”을 선택한 뒤 돌아오세요.';fallback.appendChild(hint);
+    var clicked=new Set();
+    files.forEach(function(file,index){
+      var link=document.createElement('a'),url=URL.createObjectURL(file);urls.push(url);
+      link.href=url;link.download=file.name;link.target='_blank';link.rel='noopener';link.textContent=file.name;
+      link.style.cssText='display:block;padding:12px 0;overflow-wrap:anywhere;color:#24568b;';
+      link.onclick=function(){clicked.add(index);confirmed.disabled=clicked.size!==files.length;};
+      fallback.appendChild(link);
+    });
+    var confirmed=document.createElement('button');confirmed.type='button';confirmed.textContent='모든 파일 저장을 마쳤습니다';confirmed.disabled=true;
+    confirmed.style.cssText='padding:12px;margin-top:12px;font:inherit;';confirmed.onclick=function(){finish(true);};fallback.appendChild(confirmed);
+    if(!canShare){fallback.open=true;status.textContent='아래 파일을 눌러 저장하세요. 저장을 마친 뒤 완료 버튼을 눌러 주세요.';}
+    var cancel=button('닫기');cancel.onclick=function(){finish(false);};
+    dialog.addEventListener('cancel',function(e){e.preventDefault();if(!cancel.disabled)finish(false);});
+    document.body.appendChild(dialog);dialog.showModal();
+    (canShare?share:summary).focus();
+  });
+}
+var _exportZipPromise=null;
+function exportZipLibrary(){
+  if(window.JSZip)return Promise.resolve(window.JSZip);
+  if(_exportZipPromise)return _exportZipPromise;
+  _exportZipPromise=new Promise(function(resolve,reject){
+    var s=document.createElement('script');
+    var timer=setTimeout(function(){s.remove();reject(new Error('압축 도구 연결 시간이 초과되었습니다. 다시 시도하세요.'));},20000);
+    s.src='https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+    s.onload=function(){clearTimeout(timer);window.JSZip?resolve(window.JSZip):reject(new Error('압축 도구를 열지 못했습니다.'));};
+    s.onerror=function(){clearTimeout(timer);s.remove();reject(new Error('압축 도구를 불러오지 못했습니다. 인터넷 연결을 확인하세요.'));};
+    document.head.appendChild(s);
+  }).catch(function(e){_exportZipPromise=null;throw e;});
+  return _exportZipPromise;
+}
+async function saveExportFiles(files,title,filename){
+  // iOS에서 여러 사진/CSV를 공유하면 파일 수·형식에 따라 저장이 거절될 수 있다.
+  // 일괄 내보내기는 ZIP 한 개로 인계하고 사진 한 장은 이미지 저장을 유지한다.
+  if(files.length===1)return savePreparedFiles(files,title);
+  var JSZip=await exportZipLibrary(),zip=new JSZip(),names=Object.create(null);
+  files.forEach(function(file,index){
+    var name=file.name;
+    if(names[name])name=String(index+1)+'_'+name;
+    while(names[name])name='_'+name;
+    names[name]=true;zip.file(name,file);
+  });
+  var blob=await zip.generateAsync({type:'blob',mimeType:'application/zip',compression:'STORE',streamFiles:true});
+  return shareOrDownload(blob,filename||('CPTED_'+Date.now()+'.zip'),title);
+}
+async function shareOrDownload(blob, filename, shareTitle) {
+  // JSZip의 기본 octet-stream 대신 iOS가 인식하는 ZIP MIME을 사용한다.
+  var type=/\.zip$/i.test(filename)?'application/zip':blob.type;
+  if(isIOS())return savePreparedFiles([new File([blob],filename,{type:type})],shareTitle||filename);
+  var a=document.createElement('a'),url=URL.createObjectURL(blob);
+  a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url);},60000);
+  return true;
 }
 
 // exifr 지연 로딩 — 사진 EXIF 추출 시에만 다운로드 (시작 로딩 가속)
+var _heic2anyP = null;
+// HEIC/HEIF → JPEG 변환 라이브러리 지연 로드 (아이폰 사진 호환). HEIC 감지 시에만 1.3MB 로드.
+function ensureHeic2any(){
+  if (window.heic2any) return Promise.resolve(window.heic2any);
+  if (_heic2anyP) return _heic2anyP;
+  _heic2anyP = new Promise(function(res, rej){
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+    s.onload = function(){ res(window.heic2any); };
+    s.onerror = function(){ _heic2anyP = null; rej(new Error('heic2any load failed')); };
+    document.head.appendChild(s);
+  });
+  return _heic2anyP;
+}
 var _exifrP = null;
 function ensureExifr(){
   if (window.exifr) return Promise.resolve(window.exifr);
@@ -3397,9 +3497,44 @@ function openExportSheet(){
 }
 window.openExportSheet = openExportSheet;
 // 선택 사진을 XMP 삽입된 JPEG File 객체로 변환 (방위·메모·위치 포함)
+async function exportJPEG(blob){
+  if(!(blob instanceof Blob) || !blob.size)throw new Error('사진 원본을 읽지 못했습니다.');
+  var header=new Uint8Array(await blob.slice(0,16).arrayBuffer());
+  if(header[0]===255 && header[1]===216)return blob;
+  // 확장자/MIME만 JPEG로 바꾸면 iOS에서 저장할 수 없다. 실제 픽셀을 변환한다.
+  try{
+    return await new Promise(function(resolve,reject){
+      var image=new Image(),url=URL.createObjectURL(blob),done=false;
+      var timer=setTimeout(function(){finish(null);},15000);
+      function finish(result){
+        if(done)return;done=true;clearTimeout(timer);URL.revokeObjectURL(url);
+        if(result && result.type==='image/jpeg')resolve(result);
+        else reject(new Error('사진을 JPEG로 변환하지 못했습니다.'));
+      }
+      image.onload=function(){
+        try{
+          var canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
+          var ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0);
+          canvas.toBlob(function(result){canvas.width=canvas.height=0;finish(result);},'image/jpeg',.92);
+        }catch(e){finish(null);}
+      };
+      image.onerror=function(){finish(null);};image.src=url;
+    });
+  }catch(e){
+    var brand=String.fromCharCode.apply(null,header.slice(8,12));
+    if(!/^(heic|heix|hevc|hevx|mif1|msf1)$/.test(brand) && !/image\/hei[cf]/i.test(blob.type))throw e;
+    var convert=await ensureHeic2any(),converted=await convert({blob:blob,toType:'image/jpeg',quality:.92});
+    if(Array.isArray(converted))converted=converted[0];
+    if(!(converted instanceof Blob))throw e;
+    var signature=new Uint8Array(await converted.slice(0,2).arrayBuffer());
+    if(signature[0]!==255 || signature[1]!==216)throw e;
+    return converted;
+  }
+}
 async function _photoToFile(p){
   var pts=_tsFromId(p.id,'p');
   var blob=dataUrlToBlob(p.originalUrl||p.dataUrl);
+  blob=await exportJPEG(blob);
   var xmp=buildXMPPacket({title:p.name,description:p.desc||'',tags:p.tags||[],rating:p.rating||0,heading:p.heading,location:p.lat?p.lat.toFixed(6)+','+p.lng.toFixed(6):''});
   var annotated; try{annotated=await injectXMPIntoJPEG(blob,xmp);}catch(_){annotated=blob;}
   return new File([annotated],'CPTED_'+pts+'.jpg',{type:'image/jpeg'});
@@ -3419,9 +3554,9 @@ async function runSelectiveExport(){
     }
     // iOS: 공유 시트(다중 다운로드 제한 우회) / 그 외: 개별 파일 순차 다운로드
     var shared=false;
-    if(isIOS() && navigator.share && navigator.canShare && navigator.canShare({files:files})){
-      try{ await navigator.share({files:files, title:'CPTED 현장사진 '+files.length+'장'}); shared=true; }
-      catch(e){ if(e.name==='AbortError'){pb(0);return;} }
+    if(isIOS()){
+      try{ if(!await saveExportFiles(files,'CPTED 현장사진 '+files.length+'장')){pb(0);return;} shared=true; }
+      catch(e){ pb(0);toast('파일 저장 실패: '+(e.message||'Safari에서 다시 시도하세요.'));return; }
     }
     if(!shared){
       for(var j=0;j<files.length;j++){
@@ -3457,6 +3592,7 @@ async function exportAll(){
         var pp = function(n){return String(n).padStart(2,'0');};
         var pts = pd.getFullYear()+pp(pd.getMonth()+1)+pp(pd.getDate())+'_'+pp(pd.getHours())+pp(pd.getMinutes())+pp(pd.getSeconds());
         var blob=dataUrlToBlob(p.originalUrl||p.dataUrl); // 원본 화질 우선
+        blob=await exportJPEG(blob);
         var xmp=buildXMPPacket({title:p.name,description:p.desc||'',tags:p.tags||[],
           rating:p.rating||0,heading:p.heading,location:p.lat?p.lat.toFixed(6)+','+p.lng.toFixed(6):''});
         var annotated;
@@ -3485,13 +3621,13 @@ async function exportAll(){
 
     // ── 분기: iOS = Share Sheet / Android·PC = ZIP 다운로드 (파일명 보존)
     var shared=false;
-    if(isIOS() && navigator.share && navigator.canShare && navigator.canShare({files:shareFiles})){
+    if(isIOS()){
       try{
-        await navigator.share({files:shareFiles, title:'CPTED 현장기록 '+ts});
+        if(!await saveExportFiles(shareFiles,'CPTED 현장기록 '+ts,base+'.zip')){pb(0);return;}
         shared=true;
       }catch(e){
         if(e.name==='AbortError'){pb(0);return;}
-        // 그 외 오류 → ZIP 폴백
+        pb(0);toast('파일 저장 실패: '+(e.message||'Safari에서 다시 시도하세요.'));return;
       }
     }
 
