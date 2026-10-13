@@ -1733,20 +1733,20 @@ LAYERS.hs_20.name='대상지 구역계 (내부 경계)';
 function isBoundaryLayer(id){return id.indexOf('boundary')===0 || id==='hs_19';}
 // 표시 이름과 기호만 통일한다. 레이어 ID·원본 도형·현장기록 키는 유지한다.
 var CASE_LABELS={
-  'busan-ami':{year:2017,place:'부산 서구 아미동'},
-  'jochiwon':{year:2019,place:'세종 조치원읍'},
-  'cheongju-nj':{year:2022,place:'청주 남주동·석교동'},
-  'changwon-hapseong':{year:null,place:'창원 마산회원구 합성동'},
-  'gangneung':{year:null,place:'강릉시'},
-  'pohang-nam':{year:null,place:'포항 남구 청림동'},
-  'miryang-smj':{year:null,place:'밀양 삼랑진읍'},
-  'seongju-sj':{year:null,place:'성주 성주읍'},
-  'busan-saha':{year:null,place:'부산 사하구 신평동'},
-  'ulsan-namgu':{year:null,place:'울산 남구 두왕동'},
-  'cheongju-bd':{year:null,place:'청주 흥덕구 복대2동'},
-  'pohang-buk':{year:null,place:'포항 북구'}
+  'busan-ami':{category:'성과분석',year:2017,place:'부산 서구 아미동'},
+  'jochiwon':{category:'성과분석',year:2019,place:'세종 조치원읍'},
+  'cheongju-nj':{category:'성과분석',year:2022,place:'청주 남주동·석교동'},
+  'changwon-hapseong':{category:'성과분석',year:2020,place:'창원 마산회원구 합성동'},
+  'gangneung':{category:'경찰청',year:2026,place:'강릉시'},
+  'pohang-nam':{category:'법무부',year:2026,place:'포항 남구 청림동'},
+  'miryang-smj':{category:'법무부',year:2026,place:'밀양 삼랑진읍'},
+  'seongju-sj':{category:'법무부',year:2026,place:'성주 성주읍'},
+  'busan-saha':{category:'법무부',year:2026,place:'부산 사하구 신평동'},
+  'ulsan-namgu':{category:'법무부',year:2026,place:'울산 남구 두왕동'},
+  'cheongju-bd':{category:'법무부',year:2026,place:'청주 흥덕구 복대2동'},
+  'pohang-buk':{category:'법무부',year:2026,place:'포항 북구'}
 };
-REGIONS.forEach(function(r){var c=CASE_LABELS[r.id];if(c){r.sourceName=r.name;r.year=c.year;r.name='[성과분석] '+(c.year||'연도미확인')+'_'+c.place;}});
+REGIONS.forEach(function(r){var c=CASE_LABELS[r.id];if(c){r.sourceName=r.name;r.year=c.year;r.category=c.category;r.name='['+c.category+'] '+c.year+'_'+c.place;}});
 var ELEMENT_FAMILIES={
   cctv:{color:'#3b82f6',sym:'cctv',size:16},
   light:{color:'#f59e0b',sym:'light',size:16},
@@ -6269,7 +6269,7 @@ document.addEventListener('click', function(e) {
   syncPhotoVisibilityButton();
 
   // Init data
-  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.86 · 2026-10-06 · GIS 갱신·계단 스타일·사진 삭제·선 선택 개선';
+  var _bt = document.getElementById('buildTag'); if (_bt) _bt.textContent = 'v3.87 · 2026-10-13 · 대상지 분류·사업 연도 정정';
   setNorthLock(true, true);   // 기본값: 정북 고정 ON (조용히)
   try{ var _mf=JSON.parse(localStorage.getItem('mapfilter')); if(_mf){ document.documentElement.style.setProperty('--map-sat',_mf.s); document.documentElement.style.setProperty('--map-bri',_mf.b); } }catch(_){}
   // 마커·경계 생성을 첫 페인트 이후로 미뤄 지도가 즉시 뜨게 함 (체감 로딩 가속)
